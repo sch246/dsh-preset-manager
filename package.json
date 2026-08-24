@@ -28,6 +28,7 @@
   "scripts": {
     "build": "bash scripts/build.sh",
     "setup": "bash scripts/setup.sh",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
   },
   "keywords": [
@@ -59,7 +60,12 @@
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-primitives"
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-workspace"
       ]
     }
   },
@@ -68,7 +74,12 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tsdown": "^0.22.14",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }

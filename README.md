@@ -27,7 +27,7 @@ bash scripts/setup.sh              # 见下：补丁 + 重建 + 注册 bundle
 
 `scripts/setup.sh` 依次做四件事（任一步失败即中止）：
 
-1. `git apply --check` 校验 `patches/harness-groupby-preset.patch`（改动 ui-workspace 一个包，60–80 行：分组类型加 `'preset'`、菜单第三项、子槽声明）；
+1. `git apply --check` 校验 `patches/harness-groupby-preset.patch`（改动 ui-workspace 一个包的 5 个文件、约 165 行：分组类型加 `'preset'`、菜单第三项、子槽声明与渲染槽联合、preset 模式树分支）；
 2. 应用补丁并重建被改包：`pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle`；
 3. 构建本插件（`scripts/build.sh`，自动探测 `DSH_CHECKOUT`）；
 4. `dsh plugin --profile web add .` 注册 bundle。
@@ -59,15 +59,17 @@ dsh-preset-manager/
 ├── cordis.patch.yml          # bundle 身份行（lib/index.js 为空 apply）
 ├── patches/
 │   └── harness-groupby-preset.patch   # ui-workspace 补丁（§DESIGN 3.1）
-├── tsconfig.json / tsconfig.client.json / tsdown.config.ts
+├── tsconfig.json / tsconfig.client.json / tsdown.config.ts / vitest.config.ts
 ├── scripts/
 │   ├── build.sh              # junction 链接 checkout 依赖 + tsc + tsdown
 │   ├── setup.sh              # 补丁 → 重建 → 构建 → dsh plugin add
 │   └── uninstall.sh          # 回滚补丁 + 卸 bundle
 ├── src/index.ts              # 节点半身：identity apply（装配锚点）
-├── src/client/               # 浏览器半身（分组树 / 管理 / shadow chip）
+├── src/client/               # 浏览器半身（分组树 / 管理 / shadow chip；roster.ts 纯函数 + locales/styles）
+├── tests/                    # 纯函数单测（reconcile I1–I3 正反例 / roster / grouping）
+├── lib/                      # 构建产物（随源码提交）
 ├── DESIGN.md                 # 详细设计
-└── tests/                    # 纯函数单测（reconcile / roster / grouping）
+└── README.md
 ```
 
 ## 工作原理

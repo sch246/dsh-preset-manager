@@ -1,13 +1,43 @@
 #!/usr/bin/env bash
-# 安装 dsh-preset-manager：构建（需要 dsh checkout，自动探测 DSH_CHECKOUT /
-# /root/deepseek-harness / ~/deepseek-harness），然后把本包注册进 web profile
-# （`dsh plugin add` = profile 目录里 pnpm 安装 + bundles 列表登记）。
+# 安装 dsh-preset-manager：① 校验并应用 harness 补丁（ui-workspace 五个文件）→
+# ② 重建被改包 bundle → ③ 构建本插件 → ④ 注册进 profile（`dsh plugin add`）。
 #
-# 尊重 DSH_PROFILE；缺省 web。重启 dsh web 生效。
+# 需要 dsh checkout（自动探测 DSH_CHECKOUT / /root/deepseek-harness /
+# ~/deepseek-harness）与 dsh CLI。尊重 DSH_PROFILE；缺省 web。重启 dsh web 生效。
+# 任一步失败即中止（set -e）。
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROFILE="${DSH_PROFILE:-web}"
+
+CHECKOUT="${DSH_CHECKOUT:-}"
+for CANDIDATE in "$CHECKOUT" /root/deepseek-harness "$HOME/deepseek-harness"; do
+  if [ -n "$CANDIDATE" ] && [ -d "$CANDIDATE/packages" ]; then
+    CHECKOUT="$CANDIDATE"
+    break
+  fi
+done
+if [ -z "${CHECKOUT:-}" ] || [ ! -d "$CHECKOUT/packages" ]; then
+  echo "setup: cannot locate the dsh checkout (set DSH_CHECKOUT)" >&2
+  exit 1
+fi
+
+PATCH="$REPO_DIR/patches/harness-groupby-preset.patch"
+if [ -f "$PATCH" ]; then
+  echo "checking harness patch against $CHECKOUT..."
+  if ! git -C "$CHECKOUT" apply --check "$PATCH"; then
+    echo "setup: the harness patch does not apply (dsh upgraded?) — adapt the patch first" >&2
+    exit 1
+  fi
+  if git -C "$CHECKOUT" apply --check --reverse "$PATCH" 2>/dev/null; then
+    echo "applying harness patch..."
+    git -C "$CHECKOUT" apply "$PATCH"
+  else
+    echo "harness patch already applied; skipping apply"
+  fi
+  echo "rebuilding ui-workspace bundle..."
+  (cd "$CHECKOUT" && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
+fi
 
 echo "building dsh-preset-manager..."
 bash "$REPO_DIR/scripts/build.sh"
@@ -21,4 +51,4 @@ else
 fi
 
 echo
-echo "Restart dsh web, then click the preset-manager button in the sidebar footer."
+echo "Restart dsh web; the workspace view-options menu then offers the third item 按预设."

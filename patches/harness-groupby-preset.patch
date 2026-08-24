@@ -1,0 +1,165 @@
+diff -ruN a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages/client/ui-workspace/src/client/contract/slots.ts
+--- a/packages/client/ui-workspace/src/client/contract/slots.ts	2026-08-24 14:19:53.141981895 +0800
++++ b/packages/client/ui-workspace/src/client/contract/slots.ts	2026-08-24 14:19:53.174982427 +0800
+@@ -57,6 +57,8 @@
+     'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
+     /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
+     'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
++    /** Preset-group tree filling the sidebar browsing region's preset mode (declared by the WorkspaceBrowser entry). */
++    'sidebar.workspaces.presetGroups': { kind: 'single'; scope: 'root'; owner: PresetGroupsOwnerProps }
+   }
+ }
+ 
+@@ -83,6 +85,18 @@
+ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']>
+ 
+ /**
++ * Owner share of the preset-group tree: the sidebar's width state plus the
++ * browser's live search query. The tree renders only in the wide state and
++ * filters preset group titles against `query`.
++ */
++export interface PresetGroupsOwnerProps {
++  /** True while the shell is in its wide state. */
++  wide: boolean
++  /** The browser's normalized search query ('' while the search is idle). */
++  query: string
++}
++
++/**
+  * Browser-private injected share (arrives via the register inject factory).
+  * Data reads use the global framework hooks; these are the Host actions the
+  * browsing region drives.
+@@ -142,7 +156,7 @@
+ /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */
+ export type WorkspaceBrowserProps =
+   PropsRuntime<'sidebar.workspaces'>
+-  & PropsRenderSlots<'sidebar.workspaces.directoryFlow'>
++  & PropsRenderSlots<'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.presetGroups'>
+   & PropsStore<ReturnType<typeof createWorkspaceViewStore>>
+   & Omit<WorkspaceBrowserInjected, 'hooks'>
+   & PropsHooks<WorkspaceBrowserInjected['hooks']>
+diff -ruN a/packages/client/ui-workspace/src/client/index.ts b/packages/client/ui-workspace/src/client/index.ts
+--- a/packages/client/ui-workspace/src/client/index.ts	2026-08-24 14:19:53.144981944 +0800
++++ b/packages/client/ui-workspace/src/client/index.ts	2026-08-24 14:19:53.174982427 +0800
+@@ -113,7 +113,10 @@
+   ctx.slots.inject('sidebar.workspaces', () => ctx.slots.register(
+     {
+       name: 'sidebar.workspaces',
+-      children: { 'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' } },
++      children: {
++        'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
++        'sidebar.workspaces.presetGroups': { kind: 'single', scope: 'root' },
++      },
+       store: createWorkspaceViewStore(),
+       inject: browserInjected,
+       locale: NS,
+diff -ruN a/packages/client/ui-workspace/src/client/locales.ts b/packages/client/ui-workspace/src/client/locales.ts
+--- a/packages/client/ui-workspace/src/client/locales.ts	2026-08-24 14:19:53.139981863 +0800
++++ b/packages/client/ui-workspace/src/client/locales.ts	2026-08-24 14:19:53.173982411 +0800
+@@ -9,11 +9,13 @@
+   'group.ungrouped': '未分组',
+   'session.new': '新会话',
+   'section.workspaces': '工作区',
++  'section.presets': '预设',
+   'section.sessions': '会话',
+   'viewOptions.label': '视图选项',
+   'groupBy.label': '分组方式',
+   'groupBy.workspace': '按工作区',
+   'groupBy.flat': '单列表',
++  'groupBy.preset': '按预设',
+   'orderBy.label': '排序方式',
+   'orderBy.manual': '手动排序',
+   'orderBy.updated': '最近更新',
+@@ -78,11 +80,13 @@
+   'group.ungrouped': 'Ungrouped',
+   'session.new': 'New Session',
+   'section.workspaces': 'Workspaces',
++  'section.presets': 'Presets',
+   'section.sessions': 'Sessions',
+   'viewOptions.label': 'View options',
+   'groupBy.label': 'Group by',
+   'groupBy.workspace': 'WorkSpace',
+   'groupBy.flat': 'In one list',
++  'groupBy.preset': 'By preset',
+   'orderBy.label': 'Order by',
+   'orderBy.manual': 'Manual',
+   'orderBy.updated': 'Last updated',
+diff -ruN a/packages/client/ui-workspace/src/client/stores.ts b/packages/client/ui-workspace/src/client/stores.ts
+--- a/packages/client/ui-workspace/src/client/stores.ts	2026-08-24 14:19:53.136981815 +0800
++++ b/packages/client/ui-workspace/src/client/stores.ts	2026-08-24 14:19:53.171982379 +0800
+@@ -10,8 +10,8 @@
+ /** Browser-local order account for the hierarchy-free flat Session list. */
+ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
+ 
+-/** Session-list grouping mode: workspace sections or one flat recency list. */
+-export type SessionGroupBy = 'workspace' | 'flat'
++/** Session-list grouping mode: workspace sections, one flat recency list, or preset groups. */
++export type SessionGroupBy = 'workspace' | 'flat' | 'preset'
+ /** Session order: user-arranged only, or user-arranged plus activity promotion. */
+ export type SessionOrderBy = 'manual' | 'updated'
+ 
+diff -ruN a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
+--- a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx	2026-08-24 14:19:53.147981992 +0800
++++ b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx	2026-08-24 14:19:53.179982508 +0800
+@@ -22,7 +22,7 @@
+ import type { SessionNode, SessionOrderBy } from './tree.ts'
+ import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
+ import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
+-import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
++import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from './stores.ts'
+ import { WorkspacePickFlow } from './WorkspacePicker.tsx'
+ import css from './WorkspaceBrowser.module.css'
+ 
+@@ -145,9 +145,9 @@
+ 
+ /** Grouping and ordering menu; own open state so it resets with the wide chrome. */
+ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
+-  groupBy: 'workspace' | 'flat'
++  groupBy: SessionGroupBy
+   orderBy: SessionOrderBy
+-  onGroupPick: (mode: 'workspace' | 'flat') => void
++  onGroupPick: (mode: SessionGroupBy) => void
+   onOrderPick: (mode: SessionOrderBy) => void
+   t: WorkspaceBrowserProps['t']
+ }) {
+@@ -160,6 +160,7 @@
+         { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
+         { id: 'workspace', label: t('groupBy.workspace') },
+         { id: 'flat', label: t('groupBy.flat') },
++        { id: 'preset', label: t('groupBy.preset') },
+         { type: 'separator' as const, id: 'order-by-separator' },
+         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
+         { id: 'manual', label: t('orderBy.manual') },
+@@ -167,7 +168,7 @@
+       ]}
+       selectedIds={[groupBy, orderBy]}
+       onSelect={(id) => {
+-        if (id === 'workspace' || id === 'flat') onGroupPick(id)
++        if (id === 'workspace' || id === 'flat' || id === 'preset') onGroupPick(id)
+         else if (id === 'manual' || id === 'updated') onOrderPick(id)
+         setOpen(false)
+       }}
+@@ -1012,7 +1013,11 @@
+       <div className={css.sectionHeader}>
+         {wide && (
+           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
+-            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
++            {groupBy === 'flat'
++              ? t('section.sessions')
++              : groupBy === 'preset'
++                ? t('section.presets')
++                : t('section.workspaces')}
+           </span>
+         )}
+         {wide && (
+@@ -1141,7 +1146,9 @@
+       {/* Always-mounted seat keeps the region's flex slot while the list
+           itself is wide-only. */}
+       <div className={css.listArea}>
+-        {wide && (normalizedQuery !== ''
++        {wide && (groupBy === 'preset'
++          ? renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery })
++          : normalizedQuery !== ''
+           ? (
+             <SearchResults
+               useSessions={useSessions}

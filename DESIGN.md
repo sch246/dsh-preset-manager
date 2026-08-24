@@ -33,29 +33,28 @@
 
 ### 3.1 补丁内容（`patches/harness-groupby-preset.patch`）
 
-只动 `@deepseek-ai/dsh-client-ui-workspace` 一个包，约 60–80 行，五个落点：
+只动 `@deepseek-ai/dsh-client-ui-workspace` 一个包，五个文件、约 165 行（git apply 风格 unified diff）：
 
 1. **`stores.ts`**：`SessionGroupBy` 联合类型加 `'preset'`：
    ```ts
    export type SessionGroupBy = 'workspace' | 'flat' | 'preset'
    ```
-2. **`locales.ts`**：zh `'groupBy.preset': '按预设'`，en `'By preset'`；节标题键 `section.presets`（zh `'预设'`）。
-3. **`contract/slots.ts`**：SlotMap 增补子槽键，并导出 owner props：
-   ```ts
-   'sidebar.workspaces.presetGroups': { wide: boolean; query: string }
-   ```
+2. **`locales.ts`**：zh `'groupBy.preset': '按预设'`，en `'By preset'`；节标题键 `section.presets`（zh `'预设'` / en `'Presets'`）。
+3. **`contract/slots.ts`**：SlotMap 增补子槽键，导出 owner props `PresetGroupsOwnerProps { wide: boolean; query: string }`；同时把 `WorkspaceBrowserProps` 的渲染槽联合扩为
+   `'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.presetGroups'`
+   （否则 `renderSlot` 的类型面只认得 directoryFlow 一个子键）。
 4. **`client/index.ts`** register 调用的 `children` 表增补：
    ```ts
    'sidebar.workspaces.presetGroups': { kind: 'single', scope: 'root' }
    ```
 5. **`WorkspaceBrowser.tsx`**：
-   - `ViewOptionsMenu` 菜单项加 `{ id: 'preset', label: t('groupBy.preset') }`；`onGroupPick` 接受 `'preset'`；
-   - 列表主体分支：`groupBy === 'preset'` 时渲染
-     `renderSlot('sidebar.workspaces.presetGroups', { wide, query })`
-     （`query` = 浏览器现有搜索态，供插件树做标题过滤；`wide` 沿袭现有 owner props）；
-   - 节标题计数标签：`'preset'` 时用 `t('section.presets')`。
+   - `ViewOptionsMenu` 菜单项加 `{ id: 'preset', label: t('groupBy.preset') }`；`groupBy`/`onGroupPick` 改收 `SessionGroupBy`；
+   - 列表主体分支：`groupBy === 'preset'` 时优先渲染
+     `renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery })`
+     （preset 模式下搜索态交给插件树做标题过滤，不再走全局内容搜索）；
+   - 节标题：`'preset'` 时用 `t('section.presets')`。
 
-补丁**不**改：搜索栏、"添加工作区"按钮（preset 模式下保留，v1 可接受）、工作区/扁平两模式的任何逻辑。
+补丁**不**改：搜索栏本身、"添加工作区"按钮（preset 模式下保留，v1 可接受）、工作区/扁平两模式的任何逻辑。
 
 ### 3.2 插件注册（补丁之后的扩展点）
 
@@ -125,14 +124,17 @@ interface PresetManagerState {
 ### 4.3 派生（纯函数，单测目标）
 
 ```ts
-deriveRoster(presets, state)      // → { id, displayName, description, isDefault, hidden, broken, trust }[]
-derivePresetGroups(list, roster)  // → 组树：preset 组 + “未分组”（无预设/预设已被外部删除）
+deriveRoster(presets, state)            // → { id, displayName, description, isDefault, hidden, broken, trust }[]
+reconcile(presets, order)               // → 新的 order（I1/I2 强制成立）
+planHide / planUnhide / shouldUnsetDefault   // 隐藏/取消隐藏/清空默认的纯决策
+derivePresetGroups(list, roster, order, archivedSessionIds, query)  // → 组树
 ```
 
 - 显示名 = `overrides[id].name ?? preset.name ?? id`；
 - 组内会话按 `updatedAt` 倒序（v1 无组内拖拽）；
-- 隐藏预设组：置灰、不可拖拽、星标/隐藏外的操作照常（取消隐藏/重命名），固定排在所有可见组之后（内部按 roster 顺序；纯展示层规则，`order` 仍只含可见项）；
-- 可见性照搬官方：非 subagent、未归档、blank 仅当前。
+- 组树布局：可见预设组按 `order` 顺序 → 隐藏预设组（置灰、不可拖拽、星标/隐藏外的操作照常，固定排在所有可见组之后，内部按 roster 顺序）→ “未分组”兜底组最后（工作区浏览器惯例）；`order` 只含可见项；
+- 可见性照搬官方：非 subagent、未归档、blank 仅当前；
+- `query`（浏览器搜索态）在 preset 模式下交给组树做标题过滤：组标题或组内会话标题匹配则保留组，非空时组内会话行同步过滤。
 
 ## 5. 使用的 RPC（全部现有，零新增）
 
@@ -152,9 +154,10 @@ derivePresetGroups(list, roster)  // → 组树：preset 组 + “未分组”�
 
 ```
 src/client/
-├── index.ts            # apply：store 工厂 + presetGroups 注册 + shadow SeatChip
-├── stores.ts           # createPresetManagerStore + actions（setOrder/setOverride）
-├── roster.ts           # deriveRoster / derivePresetGroups / reconcile（纯函数）
+├── index.ts            # apply：store 工厂 + roster/seat 控制器 + presetGroups 注册 + shadow SeatChip
+├── stores.ts           # createPresetManagerStore + actions（setOrder/reconcileOrder/setOverride）
+├── roster.ts           # deriveRoster / derivePresetGroups / reconcile / planHide…（纯函数）
+├── locales.ts          # presetManager 命名空间字典（zh/en）
 ├── styles.ts           # 内联 CSS 字符串（--dsw-* token），首执行注入 <style>
 ├── PresetGroups.tsx    # 分组树：搜索过滤(query) / 组行 / 拖拽 / 未分组
 ├── PresetGroupRow.tsx  # 组头：★星标 / 名称+说明 / 会话数 / 展开 / + / ⋯ / 拖拽手柄
@@ -219,13 +222,15 @@ src/client/
 ```
 dsh-preset-manager/
 ├── patches/
-│   └── harness-groupby-preset.patch   # ui-workspace 的 5 个落点（git format-patch 风格）
+│   └── harness-groupby-preset.patch   # ui-workspace 的 5 个文件（git apply 风格 unified diff）
 ├── scripts/
 │   ├── build.sh        # junction 链接 checkout 依赖 + tsc + tsdown
 │   ├── setup.sh        # 补丁 --check+apply → 重建 ui-workspace bundle → 构建本插件 → dsh plugin add
 │   └── uninstall.sh    # 回滚补丁 + 卸 bundle
 ├── src/index.ts        # 节点半身：identity apply（装配锚点）
 ├── src/client/         # 浏览器半身（§6）
+├── tests/              # 纯函数单测（reconcile / roster / grouping / planHide）
+├── vitest.config.ts    # node 环境单测配置
 ├── DESIGN.md / README.md / AGENTS.md
-└── tests/              # 纯函数单测
+└── lib/                # 构建产物，随源码提交
 ```

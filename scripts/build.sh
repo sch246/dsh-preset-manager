@@ -52,8 +52,12 @@ link_pkg @deepseek-ai/dsh-client-ui-slots packages/client/ui-slots
 link_pkg @deepseek-ai/dsh-client-ui-primitives packages/client/ui-primitives
 link_pkg @deepseek-ai/dsh-client-runtime packages/client/runtime
 link_pkg @deepseek-ai/dsh-api-remotes packages/api/remotes
+link_pkg @deepseek-ai/dsh-host-apiproxy packages/host/apiproxy
+link_pkg @deepseek-ai/dsh-client-connection packages/client/connection
+link_pkg @deepseek-ai/dsh-client-locale packages/client/locale
 link_pkg @deepseek-ai/dsh-client-ui-sidebar packages/client/ui-sidebar
 link_pkg @deepseek-ai/dsh-client-ui-conversation packages/client/ui-conversation
+link_pkg @deepseek-ai/dsh-client-ui-workspace packages/client/ui-workspace
 link_pkg @deepseek-ai/dsh-session packages/core/session
 
 # React 与类型（仅类型检查；bundle 里是模块表 external）：
@@ -65,6 +69,9 @@ done
 
 echo "=== Compiling host half src → lib (tsc $("$TSC" --version)) ==="
 "$TSC" -p tsconfig.json
+
+echo "=== Emitting client declarations src/client → lib/types (tsc) ==="
+"$TSC" -p tsconfig.client.json --noEmit false --declaration --emitDeclarationOnly --rootDir src/client --outDir lib/types/client
 
 echo "=== Bundling lib/index.js + lib/client.js (tsdown) ==="
 if [ -x "$ROOT/node_modules/.bin/tsdown" ]; then

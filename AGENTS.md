@@ -12,8 +12,8 @@
 ## 约束（为什么这么设计）
 
 - **RPC 表封闭**、`sidebar.workspaces` single slot 被官方浏览器占据：不新增 RPC、不替换官方浏览器；补丁只加扩展点，shadow 只用于 `conversation.hero.agentPreset`（priority -1，卸载即恢复）。
-- **单一列表模型**：`order[0] === settings.default`（I1）、不在列表即隐藏（I2）、全隐藏时 unset 默认（I3）。任何改动不得引入第二个顺序/可见性数据源；新增状态必须过 reconcile 的不变量论证。
-- 默认的权威拷贝在官方 settings（host 持久）；列表与名字覆盖是插件本地 store（`dsh.presetManager.v1`），每次列表变更同步 `settings.default`。
+- **单一列表 + 星标模型**：`settings.default ∈ order`（I1，星标预设永远可见）、不在列表即隐藏（I2）、无星标且列表清空时 unset 默认（I3）。任何改动不得引入第二个顺序/可见性数据源；新增状态必须过 reconcile 的不变量论证。
+- 默认的权威拷贝在官方 settings（host 持久）；列表与名字覆盖是插件本地 store（`dsh.presetManager.v1`），星标切换与清空时同步 `settings.default`（I3）。
 
 ## 代码纪律
 

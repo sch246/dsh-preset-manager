@@ -1,6 +1,6 @@
 # dsh-preset-manager 详细设计
 
-> 状态：v2，待评审。本版本按评审决定重写：**补丁路线**（官方"视图选项"菜单加"按预设"）+ **单一有序列表模型**（首项即默认、不在列表即隐藏）。
+> 状态：v3，待评审。v3 按评审决定修订：**补丁路线**（官方"视图选项"菜单加"按预设"）+ **单一有序列表 + 星标**（列表管顺序与可见性，星标管默认，星标预设永远可见）。
 > 配套：`README.md`（产品说明）、`patches/`（harness 补丁）、`scripts/`（构建/安装）。
 
 ## 1. 目标与范围
@@ -8,11 +8,11 @@
 以**独立仓库、外部插件**（+ 一个最小 harness 补丁）为 DeepSeek Harness Web GUI 提供：
 
 1. **按预设分组浏览会话**：官方"视图选项"菜单里出现第三项"按预设"，会话列表按 agent preset 分组（形式与"按工作区"一致）。
-2. **预设显示层管理**，全部落在**一个有序列表**上：
+2. **预设显示层管理**，由「一个有序列表 + 一个星标」承载：
    - 列表顺序 = 预设显示顺序 = 新会话选择器的顺序；
-   - **列表首项 = 默认预设**（同步写入官方 `agent-presets.default`）；
    - **不在列表 = 隐藏**（不出现在新会话选择器）；
-   - 拖拽组行改顺序；`⋯` 菜单：设为默认 / 重命名（显示名+说明）/ 隐藏 / 取消隐藏；
+   - **★ 星标 = 默认预设**（写入官方 `agent-presets.default`；星标预设永远可见，不可能被隐藏）；
+   - 拖拽组行改顺序；点星标切换默认；`⋯` 菜单：重命名（显示名+说明）/ 隐藏 / 取消隐藏；
    - 点击预设组行 **+** 以该预设开始新会话。
 3. **明确不做**：删除预设、删除会话。
 
@@ -70,7 +70,7 @@ ctx.slots.inject('sidebar.workspaces.presetGroups', () => ctx.slots.register({
 `PresetGroups`（本插件的分组树）只依赖四个 props share：
 - `PropsRuntime<'sidebar.workspaces.presetGroups'>`：`useSessions` / `useWorkspaces`（root scope，会话数据现成）+ owner props `{ wide, query }`；
 - `PropsStore`：本插件 store（有序列表 + overrides）；
-- inject face：`loadRoster()`、`open(id)`、`startSessionByPreset(id)`、`writeDefault(id|null)` 等。
+- inject face：`loadRoster()`、`open(id)`、`startSessionByPreset(id)`、`setDefault(id)` 等。
 
 ### 3.3 补丁的安装与回滚（`scripts/`）
 
@@ -92,33 +92,35 @@ ctx.inject(['slots', 'conversation', 'sessions', 'workspaces', 'connection'], (s
 })
 ```
 
-`SeatChip` 复刻官方 stage→apply 语义，名单换成派生名单：**只含列表成员（隐藏的不出现）、按列表顺序、显示覆盖名**。
+`SeatChip` 复刻官方 stage→apply 语义，名单换成派生名单：**只含列表成员（隐藏的不出现）、按列表顺序、显示覆盖名**；初始选中 = 星标（默认）预设。
 
-## 4. 数据模型：单一有序列表（不变量驱动）
+## 4. 数据模型：单一有序列表 + 星标（不变量驱动）
 
 ### 4.1 store（本插件声明，`persist: 'dsh.presetManager.v1'`）
 
 ```ts
 interface PresetManagerState {
-  /** 有序列表 = 可见预设集合：顺序即显示顺序，首项即默认，不在列表即隐藏。 */
+  /** 有序列表 = 可见预设集合：顺序即显示顺序；不在列表即隐藏。 */
   order: string[]
   /** 显示名/说明覆盖（重命名落点）。 */
   overrides: Record<string, { name?: string; description?: string }>
 }
 ```
 
-不变量（reconcile 强制成立，冲突从构造上不存在）：
+默认（星标）**不存本地**：权威拷贝在官方 settings 的 `agent-presets.default`，roster 的 `isDefault` 即星标状态。
 
-- **I1**：`order[0] === settings.default`（`order` 非空时）。官方默认永远在列表首位 → **默认预设不可能被隐藏**。
-- **I2**：列表 = 全部可见预设。新出现的预设（官方设置页新建）reconcile 时**追加到末尾**（默认可见）；被删除的预设从列表剔除。
-- **I3**：`order` 为空（全部隐藏）时，官方 default 被 **unset**（`settings.mutate`），新会话回落到部署默认。
+不变量（reconcile 强制成立）：
+
+- **I1 星标预设永远可见**：`settings.default ∈ order`（order 非空时）。默认预设不可能被隐藏——这是"不可能冲突的结构"的直接形式。
+- **I2 不在列表即隐藏**：列表 = 全部可见预设。新出现的预设（官方设置页新建）reconcile 时**追加到末尾**（默认可见）；被删除的预设从列表剔除。
+- **I3 无星标且列表清空**：官方 default 被 **unset**（`settings.mutate`），新会话回落到部署默认。有星标时列表不可能清空（I1 挡住对星标预设的隐藏）。
 
 ### 4.2 reconcile（每次 load / `settings/document-updated` / 本插件写后回读）
 
 1. `order := order ∩ 现存预设 id`；新 id 追加到末尾；
-2. 若 `roster.isDefault` 指向的预设存在且不在 `order[0]`：把它**移到首位**（外部改默认 → 自动取消隐藏并置顶）；
-3. 若 `roster.isDefault` 与 `order[0]` 一致：不动；
-4. 本插件写操作的顺序：先改 `order`，再写 `settings.default = order[0]`（或 unset）；事件回读后 I1 已成立，幂等。
+2. 若 `roster.isDefault` 指向的预设存在且不在 `order`：**取消隐藏并追加到末尾**（外部把隐藏预设设为默认 → 自动可见）；
+3. 若 default 已被删除且本插件曾写过它：roster 会回落（host 侧 remove 时自动清 default），reconcile 只需跟随 `isDefault`；
+4. 本插件写操作的顺序：先改 `order`（必要时），再写 settings（`update default` / `mutate unset`）；事件回读后 I1–I3 已成立，幂等。
 
 ### 4.3 派生（纯函数，单测目标）
 
@@ -135,15 +137,15 @@ derivePresetGroups(list, roster)  // → 组树：preset 组 + “未分组”�
 
 | 动作 | RPC / 通道 | 说明 |
 |---|---|---|
-| 读名单 | `agentPreset.list({})` | 面板树加载 / `connection/reset` / 本插件写后回读 |
-| 写默认 | `settings.update({ ns:'agent-presets', patch:{ default: order[0] } })` | 每次列表变更 |
-| 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | 仅当列表清空 |
+| 读名单 | `agentPreset.list({})` | 分组树加载 / `connection/reset` / 本插件写后回读 |
+| 写默认（星标） | `settings.update({ ns:'agent-presets', patch:{ default: id } })` | 点星标 |
+| 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | 仅 I3（无星标且列表清空） |
 | 默认被外部改 | `remote.$on('settings/document-updated', ns==='agent-presets')` → reconcile | 官方设置页与插件互相同步 |
 | 开新会话（+） | `workspaces.startSession(target)` → 空白会话 current 后 `agentPreset.select({ sessionId, agentPreset })` | 复用官方 seat 的 stage→apply 语义 |
 | 打开会话 | `ctx.sessions.open(id)` | 现有服务动词 |
 | 排序/隐藏/改名 | 无 RPC，落 §4.1 的本地 store | 显示层数据 |
 
-**+ 按钮 workspace 目标**（照搬 `workspaces.startSession`）：当前会话所在 workspace → 最近 workspace → 无 workspace 则无操作（面板给出提示）。
+**+ 按钮 workspace 目标**（照搬 `workspaces.startSession`）：当前会话所在 workspace → 最近 workspace → 无 workspace 则无操作（给出提示）。
 
 ## 6. 组件结构
 
@@ -154,32 +156,34 @@ src/client/
 ├── roster.ts           # deriveRoster / derivePresetGroups / reconcile（纯函数）
 ├── styles.ts           # 内联 CSS 字符串（--dsw-* token），首执行注入 <style>
 ├── PresetGroups.tsx    # 分组树：搜索过滤(query) / 组行 / 拖拽 / 未分组
-├── PresetGroupRow.tsx  # 组头：名称+说明 / 会话数 / 展开 / + / ⋯ / 拖拽手柄 / 默认徽标
-├── PresetMenu.tsx      # ⋯：设为默认 / 重命名 / 隐藏(取消隐藏)
+├── PresetGroupRow.tsx  # 组头：★星标 / 名称+说明 / 会话数 / 展开 / + / ⋯ / 拖拽手柄
+├── PresetMenu.tsx      # ⋯：重命名 / 隐藏(取消隐藏)
 ├── RenameDialog.tsx    # 重命名（name + description）
 ├── SessionRow.tsx      # 会话行：标题 / workspace 标签 / 运行点 / 时间
 └── SeatChip.tsx        # shadow 接管的新会话选择器
 ```
 
-### 6.1 列表操作语义（单一列表模型的 UI 映射）
+### 6.1 操作语义（单列表 + 星标）
 
 | 用户动作 | store 变化 | settings 同步 |
 |---|---|---|
-| 拖拽组行到位置 i | `order` 重排 | `default = order[0]`（首项变化时） |
-| ⋯ 设为默认 | 目标移到首位 | `default = 目标` |
-| ⋯ 隐藏 | 从 `order` 移除 | 若移除的是首项：`default = order[0]` |
-| 取消隐藏 | 追加到 `order` 末尾 | 无（除非列表此前为空 → `default = 该项`） |
-| 全部隐藏（order 空） | — | `mutate unset default` |
-| 外部改默认 | reconcile 移到首位（取消隐藏） | 已成立 |
-| 外部新建预设 | reconcile 追加末尾（可见） | 无 |
+| 点 ★（可见预设） | 无 | `default = 该预设` |
+| 点 ★（隐藏预设） | 取消隐藏：追加到 `order` 末尾 | `default = 该预设` |
+| 隐藏（非星标） | 从 `order` 移除 | 无 |
+| 隐藏（星标预设） | **拒绝** + 提示"默认预设不能被隐藏，请先星标另一个预设" | 无 |
+| 全部隐藏 | 仅无星标时可能 | `mutate unset default` |
+| 拖拽组行 | `order` 重排（与默认无关） | 无 |
+| 重命名 | `overrides` 更新 | 无 |
+| 外部改默认 | reconcile：若目标被隐藏则取消隐藏并追加 | 已成立 |
+| 外部新建预设 | reconcile：追加到末尾（可见） | 无 |
 
-取消隐藏追加到末尾 = "隐藏顺序丢失"的已确认取舍。
+取消隐藏追加到末尾 = "隐藏顺序丢失"的已确认取舍；默认位置在列表里自由（星标与顺序解耦）。
 
 ## 7. 关键流程
 
-1. **启动/刷新**：load roster → reconcile（I1/I2）→ 渲染分组树（首项带"默认"徽标）。
-2. **星标已移除**：默认的可视表达 = 首位 + 徽标 + ⋯ 菜单的"设为默认"。
-3. **隐藏**：从列表移除 → 组行保留但置灰（同工作区浏览器的归档交互）→ shadow chip 不再出现该预设。
+1. **启动/刷新**：load roster → reconcile（I1/I2）→ 渲染分组树（星标预设显示实心 ★）。
+2. **星标切换**：写 `settings.default` → 回读 roster → 星标移动；隐藏预设上的星标同时取消隐藏。
+3. **隐藏**：从列表移除 → 组行保留但置灰（同工作区浏览器的归档交互）→ shadow chip 不再出现该预设；星标预设的隐藏被拒绝。
 4. **以预设开始新会话**：见 §5。
 5. **重命名**：对话框写 `overrides`；不改 id、不写 `preset.yml`。
 
@@ -198,14 +202,14 @@ src/client/
 |---|---|---|
 | P0 | 生成 `patches/harness-groupby-preset.patch`，apply + 重建 ui-workspace bundle + 验证菜单第三项出现 | 0.5 天 |
 | P1 | 插件骨架 + 分组树（组行/会话行/未分组/搜索过滤）+ 打开会话 + + 新会话 | 1–1.5 天 |
-| P2 | 列表管理：拖拽、设为默认、隐藏/取消隐藏、重命名、reconcile、shadow SeatChip | 1.5–2 天 |
-| P3 | 打磨：空态/错误路径、uninstall 脚本、README 完整化、真机全流程验证 | 1 天 |
+| P2 | 管理：星标、拖拽、隐藏/取消隐藏、重命名、reconcile、shadow SeatChip | 1.5–2 天 |
+| P3 | 打磨：空态/错误路径、uninstall 脚本验证、README 完整化、真机全流程验证 | 1 天 |
 
 总计约 **4–5 个工作日**。
 
 ## 10. 测试与验证
 
-- 单测（vitest，纯函数）：`reconcile`（I1/I2/I3 全部场景：外部改默认、新建预设、删除预设、全隐藏）、`deriveRoster`、`derivePresetGroups`。
+- 单测（vitest，纯函数）：`reconcile`（I1/I2/I3 全部场景：外部改默认、隐藏星标预设被拒、新建预设、删除预设、全隐藏）、`deriveRoster`、`derivePresetGroups`。
 - 真机验证：补丁 apply → 重建 → 插件装配 → 手工过全部流程；重点验证 shadow chip 与官方设置的默认互同步。
 - 仓库门禁从简：`typecheck` + 单测 + `build`；harness 重量门禁不适用于外部仓库。
 

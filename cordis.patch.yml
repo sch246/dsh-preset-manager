@@ -1,0 +1,12 @@
+# dsh-preset-manager bundle 层：一条身份行。
+#
+# 节点半身（lib/index.js）目前是空 apply，作用只有两件：
+#   1. 让 `dsh plugin add .` 把本包登记为 profile 的 bundle 层；
+#   2. 让 client-modules 扫描到本条目，把 lib/client.js 加进浏览器插件清单
+#      （/plugins/dsh-preset-manager/client.js + window.__DSH_BOOT__）。
+# 所有功能都在浏览器半身（src/client/）。
+
+- insert:
+    - id: dsh-preset-manager
+      name: dsh-preset-manager
+      config: {}

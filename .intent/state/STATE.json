@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.8",
+  "revision": "0.1.0-draft.10",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -13,7 +13,8 @@
     "../logs/2026-08-26-session-actions-repair-and-adapter-direction.md",
     "../logs/2026-08-26-dsh-std-non-adoption.md",
     "../logs/2026-08-26-preexisting-patch-ownership-repair.md",
-    "../logs/2026-08-26-source-region-ownership-practice.md"
+    "../logs/2026-08-26-source-region-ownership-practice.md",
+    "../logs/2026-08-26-marker-locator-simplification.md"
   ],
   "protocol": {
     "id": "meta-intent",
@@ -28,8 +29,8 @@
       "id": "repository.dsh-preset-manager",
       "kind": "git-repository",
       "uri": "https://github.com/sch246/dsh-preset-manager.git",
-      "revision": "44c3a9eaecfe1c3fe4aaaf160436f8d673b7dca1",
-      "scope": "historical committed baseline before the current v4 implementation; exact current realization binding remains pending"
+      "revision": "a9981bbc3f265b910b333574e5072e46e3db8cfc",
+      "scope": "immutable current source identity selected by candidate 1"
     },
     {
       "id": "target.deepseek-harness",

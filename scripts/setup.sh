@@ -40,7 +40,7 @@ fi
 PATCH_APPLIED_BY_SETUP=false
 
 verify_source_markers() {
-  local needle='"package":"dsh-preset-manager"'
+  local needle='@meta-intent:begin dsh-preset-manager '
   local paths=(
     packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
     packages/client/ui-workspace/src/client/contract/slots.ts

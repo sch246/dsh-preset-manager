@@ -1,29 +1,29 @@
 diff --git a/packages/client/ui-workspace/README.md b/packages/client/ui-workspace/README.md
-index 041c886ae3..0652dd5f29 100644
+index 041c886ae3..be9288186f 100644
 --- a/packages/client/ui-workspace/README.md
 +++ b/packages/client/ui-workspace/README.md
 @@ -6,6 +6,10 @@ Shared Workspace browser and picker plugin. `WorkspaceBrowser` fills the sidebar
  
  The browser renders grouped or flat Session rows from the global runtime hooks and owns Workspace add/rename/reorder plus Session reorder. A Workspace remembers whether it is closed or showing Sessions; an open Workspace shows five Sessions by default, offers a transient **Show more** control for the remainder, and returns to five after the whole Workspace is closed and reopened. Creating a Session from a Workspace row first opens that group so the new row remains visible when the Session state arrives. Once the Workspace list baseline is ready, browser-persisted expansion and Session-order records retain only current Workspace ids plus Ungrouped and the flat-list account. View options combine grouping with one browser-persisted Session order per account: real Workspaces initialize from `WorkspaceView.sessionIds`, while Ungrouped and the cross-Workspace flat list initialize from recency. **Manual** and **Last updated** apply in either presentation. Entering Last updated performs a complete recency sort and later user prompts or steers promote their Session once, while entering Manual preserves every current position and disables later promotion. Dragging edits the current order in either mode; Manual-mode drags for real Workspaces also update the Host Session account, while Ungrouped and flat-list orders remain browser-local because neither has one Workspace account. Flat rows omit the empty leading status slot because they have no parent hierarchy, but retain it when a Session status is visible. Workspace drag order is Host-durable in either Session order mode.
  
-+<!-- @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"document the official row authority exposed to alternate grouping occupants","part":"documentation-en"} -->
++<!-- @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"document the official row authority exposed to alternate grouping occupants"} -->
 +An alternate grouping registered in `sidebar.workspaces.presetGroups` receives the official Session projection, row render seats, and required rename/fork/archive callbacks from the browser owner. It can add a group identity, metadata, and actions, but it does not import or clone Workspace row implementations; collapse, overflow, activity animation, menus, spacing, and whole-group drag previews therefore retain one authority in this package.
-+<!-- @meta-intent:end {"region":"workspace.rows.alternateGrouping"} -->
++<!-- @meta-intent:end dsh-preset-manager -->
 +
  Collapsed search is one header action beside the view and add actions. In the rail, add and search render as 36px controls on the shell's shared horizontal entry path. Activating search expands the field across the header; an outside click collapses only a query that is empty after trimming — except while the rail search gesture is still in flight (until focus lands in the input after the column slide), so the expanding click cannot dismiss the search it opened — while the clear control always resets and collapses it. A non-blank search query replaces either browsing mode with one flat result list: case-insensitive title and Workspace substring matches appear immediately, while a 250 ms debounced Host request adds ranked current-conversation content matches and snippets. The English search input and its defensive request path remove NUL, cap the query at the wire schema's 500 UTF-16 code units without splitting a surrogate pair, and preserve the existing debounce and cancellation behavior. Each new query aborts the preceding request; a failed content search leaves metadata matches visible with a warning. The list is capped at 20, asks the user to narrow broader queries, and opens the selected Session without clearing the query or jumping to a specific event.
  
  The picker lists real Host Workspace entities through the global `useWorkspaces` hook. Selecting a Workspace invokes the slot owner's `onPick` callback to retarget the frontend Session object. Distinct canonical paths remain separate id-keyed Workspaces when their basenames and display titles match; the sidebar hover detail shows a POSIX home or descendant as `~` / `~/…` and leaves a Windows path verbatim. Each registration declares a **directory-flow child hole** (`single` kind: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) that the composed picker package's client half fills with its picking interaction — the [`-native`](../../host/directory-picker-native/README.md) backend's renderless OS-chooser driver today, an in-app browsing dialog under a `-browse` composition. The flat **Add workspace...** action renders only while the surface's hole is occupied (occupancy read per menu render; an empty hole means the composition has no picking affordance — the seam's documented no-flow default, under which the sidebar header drops its add button rather than offering a dead one). This package owns the trigger and the adoption: the occupant reports one picked path per open through the hole's owner conversation (`open`/`busy`/`onPicked`/`onCancel`/`onError`), and the owner adopts it through the object layer, selecting the committed Workspace only after its list projection has refreshed; cancellation is silent, and errors land in the retryable folder dialog whose **Choose again** reopens the flow. Adding has exactly one route: the occupant's own create-folder affordance already covers a brand-new directory, so no separate create-by-name dialog exists. A menu only appears where there is something to choose between — with no Workspace listed, the anchor gesture raises the flow directly instead of a one-row popover, and it waits for the list baseline before treating an empty list as final. The runtime Session and Workspace services own materialization. The Workspace row's Delete action opens a confirmation that states the retention boundary, blocks duplicate submission, and keeps failures open; success removes the group while its Sessions remain under Ungrouped. The Session row's Rename action opens the same browser-owned dialog pattern prefilled with the row's display title: no client-side conflict rule exists (the host normalizes and may reject with `title-invalid`, rendered in the dialog alert), and confirming an unchanged title is deliberately allowed — it pins the current automatic title against regeneration. The Session row's Archive action commits without a confirmation dialog (non-destructive: the log and the workspace accounting slot remain) through `ctx.workspaces.archiveSession`; the row disappears from every grouping surface — workspace groups, Ungrouped, content search, and the flat list — when the archive-set echo lands, and failures are console diagnostics that leave the tree unchanged. A blank New Session row is a pure placeholder: it renders no row menu and no time label (nothing has happened in it yet), so rename, fork, and archive first apply once the first prompt lands.
 diff --git a/packages/client/ui-workspace/README.zh.md b/packages/client/ui-workspace/README.zh.md
-index de9419799e..ebca5a7fe7 100644
+index de9419799e..3b502563f4 100644
 --- a/packages/client/ui-workspace/README.zh.md
 +++ b/packages/client/ui-workspace/README.zh.md
 @@ -6,6 +6,10 @@
  
  该浏览器通过全局运行时钩子将 Session 行渲染为分组或扁平形式，并负责 Workspace 添加／重命名／重排序以及 Session 重排序。每个 Workspace 会记住自身是关闭还是显示 Session；打开后默认显示五条 Session，其余条目通过临时的**展开其余**控件显示，而关闭并重新打开整个 Workspace 后会恢复为五条。从 Workspace 行创建 Session 时会先打开该分组，使 Session 状态到达后新行保持可见。Workspace 列表基线就绪后，浏览器持久化的展开状态与 Session 顺序记录只保留当前 Workspace id、Ungrouped 和单列表记账。视图选项把分组方式和每个记账各自的一份浏览器持久化 Session 顺序放在一起：真实 Workspace 从 `WorkspaceView.sessionIds` 初始化，Ungrouped 和跨 Workspace 的单列表则从最近更新时间顺序初始化。**手动排序**和**最近更新**在两种呈现方式下都可用。进入最近更新时会执行一次完整的时间排序，后续 user prompt 或 steer 会将对应 Session 置顶一次；进入手动排序则保留所有当前位置并停用后续置顶。两种模式下的拖拽都会编辑当前顺序；真实 Workspace 在手动模式下的拖拽还会更新 Host Session 记账，而 Ungrouped 和单列表因没有单一 Workspace 记账，其顺序始终只保存在浏览器本地。单列表没有父级层次，因此不显示空的左侧状态槽；Session 存在可见状态时仍保留该槽。无论采用哪种 Session 顺序，Workspace 拖拽顺序都由 Host 持久化。
  
-+<!-- @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"记录备选分组使用的官方行实现权威","part":"documentation-zh"} -->
++<!-- @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"记录备选分组使用的官方行实现权威"} -->
 +在 `sidebar.workspaces.presetGroups` 注册的备选分组会从浏览器 owner 接收官方 Session 投影、行渲染席位以及必需的重命名／分叉／归档回调。它可以添加分组身份、元数据和操作，但不会导入或复制 Workspace 行实现；折叠、溢出、活动动画、菜单、间距和整组拖拽预览因此都由本包内的唯一权威负责。
-+<!-- @meta-intent:end {"region":"workspace.rows.alternateGrouping"} -->
++<!-- @meta-intent:end dsh-preset-manager -->
 +
  折叠搜索是视图和添加操作旁的一枚区头按钮。在轨道中，添加和搜索会渲染为沿外壳共用横向进入路径移动的 36px 控件。激活搜索后，输入框会扩展并占据区头；点击外部只会收起经清除首尾空白后为空的查询——但轨道搜索手势仍在进行期间（直至列滑动结束、焦点落入输入框）除外，这样触发展开的那次点击不会收起它刚打开的搜索——而清除控件总会重置并收起搜索。非空白查询会以单一扁平结果列表替代任一浏览模式：不区分大小写的标题和 Workspace 子串匹配项会立即显示，经 250 ms 防抖的 Host 请求则会加入经过排序的当前对话内容匹配项及其摘要片段。英文搜索输入框及其防御性请求路径会移除 NUL，将查询限制在传输 schema 规定的 500 个 UTF-16 代码单元内且不会拆分代理项对，并保留现有的防抖与取消行为。每次新查询都会中止前一个请求；内容搜索失败时，元数据匹配项仍会显示，同时给出警告。列表最多显示 20 条结果，并会在查询过宽时提示用户缩小范围；打开所选 Session 时既不会清除查询，也不会跳转至特定事件。
  
@@ -104,7 +104,7 @@ index 4d19163322..e6488191b3 100644
    padding: 16px 12px;
    color: var(--dsw-alias-label-tertiary);
 diff --git a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
-index 08f22ed400..f8a975d4ee 100644
+index 08f22ed400..7161d8702a 100644
 --- a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
 +++ b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
 @@ -18,11 +18,13 @@ import {
@@ -141,9 +141,9 @@ index 08f22ed400..f8a975d4ee 100644
          { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
          { id: 'workspace', label: t('groupBy.workspace') },
          { id: 'flat', label: t('groupBy.flat') },
-+        // @meta-intent:begin {"region":"workspace.groupBy.preset","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"expose preset grouping in the browser view menu","part":"view-menu"}
++        // @meta-intent:begin dsh-preset-manager {"region":"workspace.groupBy.preset","purpose":"expose preset grouping in the browser view menu"}
 +        { id: 'preset', label: t('groupBy.preset') },
-+        // @meta-intent:end {"region":"workspace.groupBy.preset"}
++        // @meta-intent:end dsh-preset-manager
          { type: 'separator' as const, id: 'order-by-separator' },
          { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
          { id: 'manual', label: t('orderBy.manual') },
@@ -152,9 +152,9 @@ index 08f22ed400..f8a975d4ee 100644
        selectedIds={[groupBy, orderBy]}
        onSelect={(id) => {
 -        if (id === 'workspace' || id === 'flat') onGroupPick(id)
-+        // @meta-intent:begin {"region":"workspace.groupBy.preset","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"accept preset as a grouping selection","part":"view-menu-dispatch"}
++        // @meta-intent:begin dsh-preset-manager {"region":"workspace.groupBy.preset","purpose":"accept preset as a grouping selection"}
 +        if (id === 'workspace' || id === 'flat' || id === 'preset') onGroupPick(id)
-+        // @meta-intent:end {"region":"workspace.groupBy.preset"}
++        // @meta-intent:end dsh-preset-manager
          else if (id === 'manual' || id === 'updated') onOrderPick(id)
          setOpen(false)
        }}
@@ -185,7 +185,7 @@ index 08f22ed400..f8a975d4ee 100644
            // inter-group breathing room is the section's own margin
            // (WorkspaceBrowser.module.css).
 -            <div
-+            {/* @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"route native workspace groups through the same official group-row authority exposed to occupants","part":"native-consumer"} */}
++            {/* @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"route native workspace groups through the same official group-row authority exposed to occupants"} */}
 +            <ProjectGroupItem
                key={group.key}
 -              className={clsx(
@@ -238,7 +238,7 @@ index 08f22ed400..f8a975d4ee 100644
                )}
 -            </div>
 +            </ProjectGroupItem>
-+            {/* @meta-intent:end {"region":"workspace.rows.alternateGrouping"} */}
++            {/* @meta-intent:end dsh-preset-manager */}
            )
          })}
        </div>
@@ -246,7 +246,7 @@ index 08f22ed400..f8a975d4ee 100644
      const current = state.current
      return current !== undefined && state.byId[current]?.blank === true ? current : undefined
    })
-+  // @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"bind official projection and row render seats for alternate grouping occupants","part":"owner-runtime"}
++  // @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"bind official projection and row render seats for alternate grouping occupants"}
 +  const presetRows = useMemo<PresetRowsOwner>(() => ({
 +    deriveSessions: deriveFlat,
 +    workspaceLabel,
@@ -255,7 +255,7 @@ index 08f22ed400..f8a975d4ee 100644
 +    renderSessionRow: props => <SessionNodeItem {...props} t={t} />,
 +    renderSessionOverflow: props => <SessionOverflowButton {...props} t={t} />,
 +  }), [t])
-+  // @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++  // @meta-intent:end dsh-preset-manager
    const currentBlankAccount = currentBlankSessionId === undefined
      ? undefined
      : (workspaces.find(workspace => workspace.sessionIds.includes(currentBlankSessionId))
@@ -264,13 +264,13 @@ index 08f22ed400..f8a975d4ee 100644
          {wide && (
            <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
 -            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
-+            {/* @meta-intent:begin {"region":"workspace.groupBy.preset","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"label the active preset grouping mode","part":"section-label"} */}
++            {/* @meta-intent:begin dsh-preset-manager {"region":"workspace.groupBy.preset","purpose":"label the active preset grouping mode"} */}
 +            {groupBy === 'flat'
 +              ? t('section.sessions')
 +              : groupBy === 'preset'
 +                ? t('section.presets')
 +                : t('section.workspaces')}
-+            {/* @meta-intent:end {"region":"workspace.groupBy.preset"} */}
++            {/* @meta-intent:end dsh-preset-manager */}
            </span>
          )}
          {wide && (
@@ -279,7 +279,7 @@ index 08f22ed400..f8a975d4ee 100644
            itself is wide-only. */}
        <div className={css.listArea}>
 -        {wide && (normalizedQuery !== ''
-+        {/* @meta-intent:begin {"region":"sidebar.workspaces.presetGroups","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"seat the alternate grouping with official rows and required session actions","part":"render-seat"} */}
++        {/* @meta-intent:begin dsh-preset-manager {"region":"sidebar.workspaces.presetGroups","purpose":"seat the alternate grouping with official rows and required session actions"} */}
 +        {wide && (groupBy === 'preset'
 +          ? renderSlot('sidebar.workspaces.presetGroups', {
 +            wide,
@@ -299,12 +299,12 @@ index 08f22ed400..f8a975d4ee 100644
                  }}
                />
              ))}
-+        {/* @meta-intent:end {"region":"sidebar.workspaces.presetGroups"} */}
++        {/* @meta-intent:end dsh-preset-manager */}
        </div>
  
        <Modal
 diff --git a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages/client/ui-workspace/src/client/contract/slots.ts
-index bdd85052a0..7d2336f8c9 100644
+index bdd85052a0..3fa26b009d 100644
 --- a/packages/client/ui-workspace/src/client/contract/slots.ts
 +++ b/packages/client/ui-workspace/src/client/contract/slots.ts
 @@ -22,6 +22,7 @@
@@ -334,10 +334,10 @@ index bdd85052a0..7d2336f8c9 100644
      'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
      /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
      'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
-+    // @meta-intent:begin {"region":"sidebar.workspaces.presetGroups","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"declare the alternate preset-group occupant contract","part":"slot-map"}
++    // @meta-intent:begin dsh-preset-manager {"region":"sidebar.workspaces.presetGroups","purpose":"declare the alternate preset-group occupant contract"}
 +    /** Preset-group tree filling the sidebar browsing region's preset mode (declared by the WorkspaceBrowser entry). */
 +    'sidebar.workspaces.presetGroups': { kind: 'single'; scope: 'root'; owner: PresetGroupsOwnerProps }
-+    // @meta-intent:end {"region":"sidebar.workspaces.presetGroups"}
++    // @meta-intent:end dsh-preset-manager
    }
  }
  
@@ -345,7 +345,7 @@ index bdd85052a0..7d2336f8c9 100644
    | 'conversation.hero.workspace.directoryFlow'
    | 'sidebar.workspaces.directoryFlow'
  
-+// @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"define the browser-owned row render seats and required session actions","part":"owner-contract"}
++// @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"define the browser-owned row render seats and required session actions"}
  /**
   * Directory-picking share both trigger surfaces consume. Occupancy rides the
   * inject face's reserved `hooks` compartment: the renderer binds the source
@@ -391,7 +391,7 @@ index bdd85052a0..7d2336f8c9 100644
 +  /** Required official row actions; omitting them would remove the row overflow surface. */
 +  sessionActions: PresetSessionActions
 +}
-+// @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++// @meta-intent:end dsh-preset-manager
 +
  /**
   * Browser-private injected share (arrives via the register inject factory).
@@ -401,14 +401,14 @@ index bdd85052a0..7d2336f8c9 100644
  export type WorkspaceBrowserProps =
    PropsRuntime<'sidebar.workspaces'>
 -  & PropsRenderSlots<'sidebar.workspaces.directoryFlow'>
-+  // @meta-intent:begin {"region":"sidebar.workspaces.presetGroups","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"expose the preset-group render seat to the browser owner","part":"browser-props"}
++  // @meta-intent:begin dsh-preset-manager {"region":"sidebar.workspaces.presetGroups","purpose":"expose the preset-group render seat to the browser owner"}
 +  & PropsRenderSlots<'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.presetGroups'>
-+  // @meta-intent:end {"region":"sidebar.workspaces.presetGroups"}
++  // @meta-intent:end dsh-preset-manager
    & PropsStore<ReturnType<typeof createWorkspaceViewStore>>
    & Omit<WorkspaceBrowserInjected, 'hooks'>
    & PropsHooks<WorkspaceBrowserInjected['hooks']>
 diff --git a/packages/client/ui-workspace/src/client/index.ts b/packages/client/ui-workspace/src/client/index.ts
-index 93269c22c1..6b37d47324 100644
+index 93269c22c1..ee28b7164d 100644
 --- a/packages/client/ui-workspace/src/client/index.ts
 +++ b/packages/client/ui-workspace/src/client/index.ts
 @@ -21,9 +21,11 @@ import { en, zh, type WorkspaceKey } from './locales.ts'
@@ -431,22 +431,22 @@ index 93269c22c1..6b37d47324 100644
 -      children: { 'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' } },
 +      children: {
 +        'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
-+        // @meta-intent:begin {"region":"sidebar.workspaces.presetGroups","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"register the preset-group child slot with the browser lifecycle","part":"runtime-registration"}
++        // @meta-intent:begin dsh-preset-manager {"region":"sidebar.workspaces.presetGroups","purpose":"register the preset-group child slot with the browser lifecycle"}
 +        'sidebar.workspaces.presetGroups': { kind: 'single', scope: 'root' },
-+        // @meta-intent:end {"region":"sidebar.workspaces.presetGroups"}
++        // @meta-intent:end dsh-preset-manager
 +      },
        store: createWorkspaceViewStore(),
        inject: browserInjected,
        locale: NS,
 diff --git a/packages/client/ui-workspace/src/client/locales.ts b/packages/client/ui-workspace/src/client/locales.ts
-index c08fd931de..723469fd35 100644
+index c08fd931de..21752561c4 100644
 --- a/packages/client/ui-workspace/src/client/locales.ts
 +++ b/packages/client/ui-workspace/src/client/locales.ts
 @@ -9,11 +9,15 @@ export const zh = {
    'group.ungrouped': '未分组',
    'session.new': '新会话',
    'section.workspaces': '工作区',
-+  // @meta-intent:begin {"region":"workspace.groupBy.preset","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"provide preset grouping labels","part":"locale-zh"}
++  // @meta-intent:begin dsh-preset-manager {"region":"workspace.groupBy.preset","purpose":"provide preset grouping labels"}
 +  'section.presets': '预设',
    'section.sessions': '会话',
    'viewOptions.label': '视图选项',
@@ -454,7 +454,7 @@ index c08fd931de..723469fd35 100644
    'groupBy.workspace': '按工作区',
    'groupBy.flat': '单列表',
 +  'groupBy.preset': '按预设',
-+  // @meta-intent:end {"region":"workspace.groupBy.preset"}
++  // @meta-intent:end dsh-preset-manager
    'orderBy.label': '排序方式',
    'orderBy.manual': '手动排序',
    'orderBy.updated': '最近更新',
@@ -462,7 +462,7 @@ index c08fd931de..723469fd35 100644
    'group.ungrouped': 'Ungrouped',
    'session.new': 'New Session',
    'section.workspaces': 'Workspaces',
-+  // @meta-intent:begin {"region":"workspace.groupBy.preset","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"provide preset grouping labels","part":"locale-en"}
++  // @meta-intent:begin dsh-preset-manager {"region":"workspace.groupBy.preset","purpose":"provide preset grouping labels"}
 +  'section.presets': 'Presets',
    'section.sessions': 'Sessions',
    'viewOptions.label': 'View options',
@@ -470,19 +470,19 @@ index c08fd931de..723469fd35 100644
    'groupBy.workspace': 'WorkSpace',
    'groupBy.flat': 'In one list',
 +  'groupBy.preset': 'By preset',
-+  // @meta-intent:end {"region":"workspace.groupBy.preset"}
++  // @meta-intent:end dsh-preset-manager
    'orderBy.label': 'Order by',
    'orderBy.manual': 'Manual',
    'orderBy.updated': 'Last updated',
 diff --git a/packages/client/ui-workspace/src/client/rows/Rows.module.css b/packages/client/ui-workspace/src/client/rows/Rows.module.css
-index 5dc899af45..04c869c333 100644
+index 5dc899af45..d7c2a8f389 100644
 --- a/packages/client/ui-workspace/src/client/rows/Rows.module.css
 +++ b/packages/client/ui-workspace/src/client/rows/Rows.module.css
 @@ -15,11 +15,64 @@
    color: var(--dsw-alias-label-primary);
  }
  
-+/* @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"keep shared group spacing drag previews and muted state in the official row stylesheet","part":"project-group-styles"} */
++/* @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"keep shared group spacing drag previews and muted state in the official row stylesheet"} */
 +.projectGroup {
 +  position: relative;
 +}
@@ -538,7 +538,7 @@ index 5dc899af45..04c869c333 100644
 +.projectRow.muted {
 +  opacity: 0.55;
 +}
-+/* @meta-intent:end {"region":"workspace.rows.alternateGrouping"} */
++/* @meta-intent:end dsh-preset-manager */
 +
  .sessionRow.selected {
    background: var(--dsw-alias-interactive-bg-hover);
@@ -547,7 +547,7 @@ index 5dc899af45..04c869c333 100644
    flex: 1;
  }
  
-+/* @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"style bounded grouping metadata in official project and session rows","part":"metadata-styles"} */
++/* @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"style bounded grouping metadata in official project and session rows"} */
  .meta {
    overflow: hidden;
    text-overflow: ellipsis;
@@ -560,7 +560,7 @@ index 5dc899af45..04c869c333 100644
 +  max-width: 40%;
 +  margin-right: 6px;
 +}
-+/* @meta-intent:end {"region":"workspace.rows.alternateGrouping"} */
++/* @meta-intent:end dsh-preset-manager */
 +
  .time {
    flex: none;
@@ -569,7 +569,7 @@ index 5dc899af45..04c869c333 100644
    color: var(--dsw-alias-label-primary);
  }
  
-+/* @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"keep the shared overflow control in the official row stylesheet","part":"overflow-styles"} */
++/* @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"keep the shared overflow control in the official row stylesheet"} */
 +.sessionOverflowButton {
 +  width: 100%;
 +  height: 28px;
@@ -590,13 +590,13 @@ index 5dc899af45..04c869c333 100644
 +.sessionOverflowButton:hover {
 +  color: var(--dsw-alias-label-secondary);
 +}
-+/* @meta-intent:end {"region":"workspace.rows.alternateGrouping"} */
++/* @meta-intent:end dsh-preset-manager */
 +
  /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step
     darker (tertiary, #81858C) per the cell spec. */
  .chevron {
 diff --git a/packages/client/ui-workspace/src/client/rows/Rows.tsx b/packages/client/ui-workspace/src/client/rows/Rows.tsx
-index d2d121fe4d..a409ac18e2 100644
+index d2d121fe4d..7e79205f22 100644
 --- a/packages/client/ui-workspace/src/client/rows/Rows.tsx
 +++ b/packages/client/ui-workspace/src/client/rows/Rows.tsx
 @@ -6,7 +6,9 @@
@@ -628,7 +628,7 @@ index d2d121fe4d..a409ac18e2 100644
    end: () => void
  }
  
-+// @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"centralize complete project-group drag geometry in the official row module","part":"project-group-authority"}
++// @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"centralize complete project-group drag geometry in the official row module"}
  /** Drag lifecycle owned by a workspace row; its enclosing group owns hit testing. */
 -interface WorkspaceRowDragProps {
 +export interface ProjectRowDragProps {
@@ -695,9 +695,9 @@ index d2d121fe4d..a409ac18e2 100644
 +    </div>
 +  )
 +}
-+// @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++// @meta-intent:end dsh-preset-manager
 +
-+// @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"extend the official project row with bounded identity metadata and action seats","part":"project-row-authority"}
++// @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"extend the official project row with bounded identity metadata and action seats"}
 +/** Props for the shared project header row. */
 +export interface ProjectRowItemProps {
 +  group: GroupNode
@@ -810,7 +810,7 @@ index d2d121fe4d..a409ac18e2 100644
      />
    )
  }
-+// @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++// @meta-intent:end dsh-preset-manager
  
  /* v8 ignore next 3 -- closed-union backstop; only reached if the status is forged */
  function assertNever(value: never): never {
@@ -819,7 +819,7 @@ index d2d121fe4d..a409ac18e2 100644
   * @returns the session row.
   */
 -export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
-+// @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"extend the official session row with optional actions and grouping metadata","part":"session-row-authority"}
++// @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"extend the official session row with optional actions and grouping metadata"}
 +export interface SessionNodeItemProps {
    node: SessionNode
    currentId: string | undefined
@@ -894,9 +894,9 @@ index d2d121fe4d..a409ac18e2 100644
      />
    )
  }
-+// @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++// @meta-intent:end dsh-preset-manager
 +
-+// @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"expose the official session overflow control to alternate groupings","part":"overflow-authority"}
++// @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"expose the official session overflow control to alternate groupings"}
 +/**
 + * Standard overflow row below an expanded project group.
 + * @param props.expanded - whether all sessions are visible.
@@ -924,9 +924,9 @@ index d2d121fe4d..a409ac18e2 100644
 +    </button>
 +  )
 +}
-+// @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++// @meta-intent:end dsh-preset-manager
 diff --git a/packages/client/ui-workspace/src/client/stores.ts b/packages/client/ui-workspace/src/client/stores.ts
-index f085329643..74264f505d 100644
+index f085329643..513c6a7cc0 100644
 --- a/packages/client/ui-workspace/src/client/stores.ts
 +++ b/packages/client/ui-workspace/src/client/stores.ts
 @@ -10,8 +10,10 @@ import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-run
@@ -935,15 +935,15 @@ index f085329643..74264f505d 100644
  
 -/** Session-list grouping mode: workspace sections or one flat recency list. */
 -export type SessionGroupBy = 'workspace' | 'flat'
-+// @meta-intent:begin {"region":"workspace.groupBy.preset","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"add preset grouping to the durable workspace view mode","part":"store-contract"}
++// @meta-intent:begin dsh-preset-manager {"region":"workspace.groupBy.preset","purpose":"add preset grouping to the durable workspace view mode"}
 +/** Session-list grouping mode: workspace sections, one flat recency list, or preset groups. */
 +export type SessionGroupBy = 'workspace' | 'flat' | 'preset'
-+// @meta-intent:end {"region":"workspace.groupBy.preset"}
++// @meta-intent:end dsh-preset-manager
  /** Session order: user-arranged only, or user-arranged plus activity promotion. */
  export type SessionOrderBy = 'manual' | 'updated'
  
 diff --git a/packages/client/ui-workspace/tests/browser-styles.client.spec.ts b/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
-index 5554c977bb..550b457ba8 100644
+index 5554c977bb..5dce2c09ee 100644
 --- a/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
 +++ b/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
 @@ -72,13 +72,17 @@ describe('WorkspaceBrowser.module.css list', () => {
@@ -952,18 +952,18 @@ index 5554c977bb..550b457ba8 100644
      expect(declarations(".searchTree > [role='treeitem'] + [role='treeitem']")?.get('margin-top')).toBe('2px')
 -    expect(declarations('.groupSection > * + *')?.get('margin-top')).toBe('2px')
 -    expect(declarations('.groupSection + .groupSection')?.get('margin-top')).toBe('4px')
-+    // @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"verify shared row spacing moved to the official row stylesheet","part":"style-acceptance"}
++    // @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"verify shared row spacing moved to the official row stylesheet"}
 +    expect(rowDeclarations('.projectGroup > * + *')?.get('margin-top')).toBe('2px')
 +    expect(rowDeclarations('.projectGroup + .projectGroup')?.get('margin-top')).toBe('4px')
-+    // @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++    // @meta-intent:end dsh-preset-manager
    })
  
    it('draws drag targets as a leading chevron joined to the insertion line', () => {
      const listTopMarker = declarations('.listTopDropIndicator')
 -    const workspaceMarker = declarations('.workspaceDropBefore::before')
-+    // @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"verify shared project-group drag markers live in the official row stylesheet","part":"style-acceptance"}
++    // @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"verify shared project-group drag markers live in the official row stylesheet"}
 +    const workspaceMarker = rowDeclarations('.projectGroup.projectDropBefore::before')
-+    // @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++    // @meta-intent:end dsh-preset-manager
      const sessionMarker = rowDeclarations('.sessionRow.dropBefore::before')
      expect(listTopMarker?.get('top')).toBe('-8px')
      expect(listTopMarker?.get('left')).toBe('0')
@@ -972,14 +972,14 @@ index 5554c977bb..550b457ba8 100644
    it('keeps the compact fade, overflow control, search field, and row heights', () => {
      expect(declarations('.fade')?.get('height')).toBe('24px')
 -    expect(declarations('.sessionOverflowButton')?.get('height')).toBe('28px')
-+    // @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"verify the official shared overflow control dimensions","part":"style-acceptance"}
++    // @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"verify the official shared overflow control dimensions"}
 +    expect(rowDeclarations('.sessionOverflowButton')?.get('height')).toBe('28px')
-+    // @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++    // @meta-intent:end dsh-preset-manager
      expect(declarations('.searchExpanded')?.get('height')).toBe('30px')
      expect(rowDeclarations('.projectRow')?.get('height')).toBe('34px')
      expect(rowDeclarations('.sessionRow')?.get('height')).toBe('32px')
 diff --git a/packages/client/ui-workspace/tests/rows.client.spec.tsx b/packages/client/ui-workspace/tests/rows.client.spec.tsx
-index f86e275c5e..53de868f22 100644
+index f86e275c5e..f7f93a68ae 100644
 --- a/packages/client/ui-workspace/tests/rows.client.spec.tsx
 +++ b/packages/client/ui-workspace/tests/rows.client.spec.tsx
 @@ -4,8 +4,10 @@ import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-l
@@ -999,7 +999,7 @@ index f86e275c5e..53de868f22 100644
      expect(onToggle).toHaveBeenCalledOnce()
    })
  
-+  // @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"verify alternate groupings use official project session drag and overflow row authorities","part":"acceptance"}
++  // @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"verify alternate groupings use official project session drag and overflow row authorities"}
 +  it('renders another grouping dimension through the shared project row seats', () => {
 +    const onToggle = vi.fn()
 +    const onStar = vi.fn()
@@ -1077,25 +1077,25 @@ index f86e275c5e..53de868f22 100644
 +    view.rerender(<SessionOverflowButton expanded remaining={7} onToggle={onToggle} t={t} />)
 +    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
 +  })
-+  // @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++  // @meta-intent:end dsh-preset-manager
 +
    it('shows the green done dot only on a finished, unviewed session (live activity wins the slot)', () => {
      const renderRow = (over: Partial<SessionNode>) => render(
        <SessionNodeItem
 diff --git a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
-index 820d2bd66b..c8c282c617 100644
+index 820d2bd66b..8f6b3401d1 100644
 --- a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
 +++ b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
 @@ -153,9 +153,11 @@ describe('WorkspaceBrowser', () => {
      fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
      expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
      expect(screen.getByRole('separator')).toBeTruthy()
-+    // @meta-intent:begin {"region":"workspace.groupBy.preset","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"verify the preset grouping choice is visible","part":"acceptance"}
++    // @meta-intent:begin dsh-preset-manager {"region":"workspace.groupBy.preset","purpose":"verify the preset grouping choice is visible"}
      expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
 -      '按工作区', '单列表', '手动排序', '最近更新',
 +      '按工作区', '单列表', '按预设', '手动排序', '最近更新',
      ])
-+    // @meta-intent:end {"region":"workspace.groupBy.preset"}
++    // @meta-intent:end dsh-preset-manager
      expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
      expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
      fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
@@ -1103,7 +1103,7 @@ index 820d2bd66b..c8c282c617 100644
      expect(b.store.getSnapshot().groupBy).toBe('workspace')
    })
  
-+  // @meta-intent:begin {"region":"sidebar.workspaces.presetGroups","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"verify the preset occupant receives required browser-owned session actions","part":"acceptance"}
++  // @meta-intent:begin dsh-preset-manager {"region":"sidebar.workspaces.presetGroups","purpose":"verify the preset occupant receives required browser-owned session actions"}
 +  it('shares the official session actions with the preset grouping occupant', () => {
 +    let presetOwner: unknown
 +    const b = mount({
@@ -1124,7 +1124,7 @@ index 820d2bd66b..c8c282c617 100644
 +      onArchive: expect.any(Function),
 +    })
 +  })
-+  // @meta-intent:end {"region":"sidebar.workspaces.presetGroups"}
++  // @meta-intent:end dsh-preset-manager
 +
    it('persists flat-list drag order locally and applies Last updated within that account', async () => {
      const insertSessionBefore = vi.fn(async () => {})
@@ -1136,9 +1136,9 @@ index 820d2bd66b..c8c282c617 100644
 -    expect(firstSection.parentElement?.className).toContain('listTopDropActive')
      const marker = firstSection.parentElement?.previousElementSibling
      expect(marker?.className).toContain('listTopDropIndicator')
-+    // @meta-intent:begin {"region":"workspace.rows.alternateGrouping","mode":"exclusive","owners":[{"package":"dsh-preset-manager","realization":"preset-manager-linux-web-0.1.0-candidate.1"}],"purpose":"verify list-start suppression on the shared project-group marker","part":"acceptance"}
++    // @meta-intent:begin dsh-preset-manager {"region":"workspace.rows.alternateGrouping","purpose":"verify list-start suppression on the shared project-group marker"}
 +    expect(firstSection.className).not.toContain('projectDropBefore')
-+    // @meta-intent:end {"region":"workspace.rows.alternateGrouping"}
++    // @meta-intent:end dsh-preset-manager
    })
  
    it('accepts a document-level drop and commits the last Workspace marker on drag end', () => {

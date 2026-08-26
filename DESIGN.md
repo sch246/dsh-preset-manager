@@ -1,6 +1,6 @@
 # dsh-preset-manager 详细设计
 
-> 状态：v3，待评审。v3 按评审决定修订：**补丁路线**（官方"视图选项"菜单加"按预设"）+ **单一有序列表 + 星标**（列表管顺序与可见性，星标管默认，星标预设永远可见）。
+> 状态：v4，已实现。v4 保留补丁路线，并把冲突的“可见 order”拆为**完整顺序 + 独立 hidden + 星标**：隐藏不再破坏位置，星标预设永远可见。
 > 配套：`README.md`（产品说明）、`patches/`（harness 补丁）、`scripts/`（构建/安装）。
 
 ## 1. 目标与范围
@@ -8,9 +8,9 @@
 以**独立仓库、外部插件**（+ 一个最小 harness 补丁）为 DeepSeek Harness Web GUI 提供：
 
 1. **按预设分组浏览会话**：官方"视图选项"菜单里出现第三项"按预设"，会话列表按 agent preset 分组（形式与"按工作区"一致）。
-2. **预设显示层管理**，由「一个有序列表 + 一个星标」承载：
+2. **预设显示层管理**，由「完整顺序 + hidden 集合 + 一个星标」承载：
    - 列表顺序 = 预设显示顺序 = 新会话选择器的顺序；
-   - **不在列表 = 隐藏**（不出现在新会话选择器；分组树中置灰并固定排在显示列表末尾）；
+   - **hidden 独立于顺序**（隐藏项不出现在新会话选择器；分组树中置灰并固定排在显示列表末尾；取消隐藏恢复原位置）；
    - **★ 星标 = 默认预设**（写入官方 `agent-presets.default`；星标预设永远可见，不可能被隐藏）；
    - 拖拽组行改顺序；点星标切换默认；`⋯` 菜单：重命名（显示名+说明）/ 隐藏 / 取消隐藏；
    - 点击预设组行 **+** 以该预设开始新会话。
@@ -33,14 +33,14 @@
 
 ### 3.1 补丁内容（`patches/harness-groupby-preset.patch`）
 
-只动 `@deepseek-ai/dsh-client-ui-workspace` 一个包，五个文件、约 165 行（git apply 风格 unified diff）：
+只动 `@deepseek-ai/dsh-client-ui-workspace` 一个包（git apply 风格 unified diff；具体文件数与行数随目标 harness 版本演进）：
 
 1. **`stores.ts`**：`SessionGroupBy` 联合类型加 `'preset'`：
    ```ts
    export type SessionGroupBy = 'workspace' | 'flat' | 'preset'
    ```
 2. **`locales.ts`**：zh `'groupBy.preset': '按预设'`，en `'By preset'`；节标题键 `section.presets`（zh `'预设'` / en `'Presets'`）。
-3. **`contract/slots.ts`**：SlotMap 增补子槽键，导出 owner props `PresetGroupsOwnerProps { wide: boolean; query: string }`；同时把 `WorkspaceBrowserProps` 的渲染槽联合扩为
+3. **`contract/slots.ts`**：SlotMap 增补子槽键，导出 owner props `PresetGroupsOwnerProps { wide, query, rows, sessionActions }`；`rows: PresetRowsOwner` 由 Workspace owner 提供官方 Session 投影、工作区标签和行渲染席位，`sessionActions` 强制携带官方重命名／分叉／归档动作，避免备选分组静默丢失会话菜单。同时把 `WorkspaceBrowserProps` 的渲染槽联合扩为
    `'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.presetGroups'`
    （否则 `renderSlot` 的类型面只认得 directoryFlow 一个子键）。
 4. **`client/index.ts`** register 调用的 `children` 表增补：
@@ -50,7 +50,7 @@
 5. **`WorkspaceBrowser.tsx`**：
    - `ViewOptionsMenu` 菜单项加 `{ id: 'preset', label: t('groupBy.preset') }`；`groupBy`/`onGroupPick` 改收 `SessionGroupBy`；
    - 列表主体分支：`groupBy === 'preset'` 时优先渲染
-     `renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery })`
+      `renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery, rows: presetRows })`
      （preset 模式下搜索态交给插件树做标题过滤，不再走全局内容搜索）；
    - 节标题：`'preset'` 时用 `t('section.presets')`。
 
@@ -66,16 +66,18 @@ ctx.slots.inject('sidebar.workspaces.presetGroups', () => ctx.slots.register({
 }, PresetGroups))
 ```
 
-`PresetGroups`（本插件的分组树）只依赖四个 props share：
-- `PropsRuntime<'sidebar.workspaces.presetGroups'>`：`useSessions` / `useWorkspaces`（root scope，会话数据现成）+ owner props `{ wide, query }`；
-- `PropsStore`：本插件 store（有序列表 + overrides）；
+`PresetGroups`（本插件的分组与装饰层）只依赖四个 props share：
+- `PropsRuntime<'sidebar.workspaces.presetGroups'>`：`useSessions` / `useWorkspaces`（root scope，会话数据现成）+ owner props `{ wide, query, rows }`；其中 `rows` 是官方行唯一呈现权威；
+- `PropsStore`：本插件 store（完整 `order` + `hidden` + overrides）；
 - inject face：`loadRoster()`、`open(id)`、`startSessionByPreset(id)`、`setDefault(id)` 等。
+
+插件不运行时导入 ui-workspace 的 React 行，也不复制其 CSS。它只把星标、说明、操作和 Session 的 Workspace／项目标识放入官方行预留的 `leading`、`meta`、`rowActions` 席位。折叠、五行溢出、运行态动画和整组拖拽预览均由 ui-workspace 实现。
 
 ### 3.3 补丁的安装与回滚（`scripts/`）
 
-- `scripts/setup.sh`：`git -C <DSH_CHECKOUT> apply --check patches/harness-groupby-preset.patch` → 通过则 `apply`；重建被改包（`pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle`）；再构建本插件并 `dsh plugin add`。任一步失败即中止并提示。
-- `scripts/uninstall.sh`：`git apply -R` 回滚补丁 + `dsh plugin remove`（如可用，否则提示手动）。
-- 升级冲突：dsh 升级后补丁可能不适用；`--check` 先行检测，冲突时给出提示而不是硬打。补丁只依赖 stable 的五个落点，维护成本低。
+- `scripts/setup.sh`：识别补丁缺失、已完整存在或冲突；仅在自己实际 apply 时记录 Host 效果所有权，随后重建被改包、构建插件并 `dsh plugin add`。任一步失败即中止并提示。
+- `scripts/uninstall.sh`：仅当记录表明补丁由 setup 实际应用、SHA 仍一致且 reverse check 通过时才回滚；预先存在或已漂移的 Host 效果保持不动，bundle 仍按正常流程移除。
+- 升级冲突：dsh 升级后补丁可能不适用；`--check` 先行检测，冲突时给出提示而不是硬打。补丁依赖 ui-workspace 的 preset 分组入口和 owner 行契约，升级时以当前 diff 与测试为准。
 
 ### 3.4 新会话选择器接管（shadow，保留）
 
@@ -91,49 +93,64 @@ ctx.inject(['slots', 'conversation', 'sessions', 'workspaces', 'connection'], (s
 })
 ```
 
-`SeatChip` 复刻官方 stage→apply 语义，名单换成派生名单：**只含列表成员（隐藏的不出现）、按列表顺序、显示覆盖名**；初始选中 = 星标（默认）预设。
+`SeatChip` 复刻官方 stage→apply 语义，名单换成派生名单：**过滤 hidden、按完整 order 的可见子序列、显示覆盖名**；初始选中 = 星标（默认）预设。
 
-## 4. 数据模型：单一有序列表 + 星标（不变量驱动）
+## 4. 数据模型：完整顺序 + hidden + 星标（不变量驱动）
 
-### 4.1 store（本插件声明，`persist: 'dsh.presetManager.v1'`）
+### 4.1 store（历史存储键 `dsh.presetManager.v1`，当前 schema v2）
 
 ```ts
 interface PresetManagerState {
-  /** 有序列表 = 可见预设集合：顺序即显示顺序；不在列表即隐藏。 */
+  /** 当前为 2；旧 whole-object 快照没有此字段。 */
+  schemaVersion: 2
+  /** 首次成功读取 Host roster 后为 true。 */
+  initialized: boolean
+  /** 全部现存预设的稳定顺序；隐藏/取消隐藏不移动它。 */
   order: string[]
+  /** 独立隐藏集合；序列化为数组。 */
+  hidden: string[]
   /** 显示名/说明覆盖（重命名落点）。 */
   overrides: Record<string, { name?: string; description?: string }>
 }
 ```
 
+Harness store 会用 localStorage JSON **整体替换** `init()` 结果，没有内建 migration
+回调。因此生命周期必须由持久化字段显式表达，不能从 `order.length` 推断：
+
+- 无 localStorage：`schemaVersion:2, initialized:false`；首次 roster 中已有多少预设都按 Host 顺序完整导入，全部可见，然后原子写成 `initialized:true`；
+- 旧 v1：无 schema 且无 `hidden`，旧 `order` 是可见子序列，差集迁入 hidden；
+- 已部署的过渡模型：有 `hidden` 但无 schema，原样保留可见性并补 schema；
+- schema v2 且 initialized：以后 Host 新增的预设追加可见，删除项清理。
+
 默认（星标）**不存本地**：权威拷贝在官方 settings 的 `agent-presets.default`，roster 的 `isDefault` 即星标状态。
 
 不变量（reconcile 强制成立）：
 
-- **I1 星标预设永远可见**：`settings.default ∈ order`（order 非空时）。默认预设不可能被隐藏——这是"不可能冲突的结构"的直接形式。
-- **I2 不在列表即隐藏**：列表 = 全部可见预设。新出现的预设（官方设置页新建）reconcile 时**追加到末尾**（默认可见）；被删除的预设从列表剔除。
-- **I3 无星标且列表清空**：官方 default 被 **unset**（`settings.mutate`），新会话回落到部署默认。有星标时列表不可能清空（I1 挡住对星标预设的隐藏）。
+- **I1 星标预设永远可见**：`settings.default ∉ hidden`。默认预设不可能被隐藏。
+- **I2 完整顺序跟随 roster**：`order` 恰含全部现存预设；新预设追加且默认可见，删除项同时从 `order` 与 `hidden` 清理。
+- **I3 无星标且全部隐藏**：官方 default 被 **unset**（`settings.mutate`），新会话回落到部署默认。有星标时 I1 阻止它进入 hidden。
 
 ### 4.2 reconcile（每次 load / `settings/document-updated` / 本插件写后回读）
 
-1. `order := order ∩ 现存预设 id`；新 id 追加到末尾；
-2. 若 `roster.isDefault` 指向的预设存在且不在 `order`：**取消隐藏并追加到末尾**（外部把隐藏预设设为默认 → 自动可见）；
-3. 若 default 已被删除且本插件曾写过它：roster 会回落（host 侧 remove 时自动清 default），reconcile 只需跟随 `isDefault`；
-4. 本插件写操作的顺序：先改 `order`（必要时），再写 settings（`update default` / `mutate unset`）；事件回读后 I1–I3 已成立，幂等。
+1. 先按 schema/initialized 区分首次安装、旧快照和当前状态；首次安装导入全部现有预设为可见；
+2. `order := order ∩ 现存预设 id`；新 id 追加到末尾；`hidden` 同步清除不存在 id；
+3. 若 `roster.isDefault` 指向 hidden 预设：只从 `hidden` 移除，保留 `order` 位置；
+4. 若 default 已被删除且本插件曾写过它：roster 会回落（host 侧 remove 时自动清 default），reconcile 只需跟随 `isDefault`；
+5. 本插件写操作先改 `hidden`（必要时），再写 settings（`update default` / `mutate unset`）；事件回读后 I1–I3 已成立，幂等。
 
 ### 4.3 派生（纯函数，单测目标）
 
 ```ts
 deriveRoster(presets, state)            // → { id, displayName, description, isDefault, hidden, broken, trust }[]
-reconcile(presets, order)               // → 新的 order（I1/I2 强制成立）
+reconcile(presets, storedState)         // → 当前 schema（首次安装 + I1/I2 + 旧版迁移）
 planHide / planUnhide / shouldUnsetDefault   // 隐藏/取消隐藏/清空默认的纯决策
-derivePresetGroups(list, roster, order, archivedSessionIds, query)  // → 组树
+derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组树
 ```
 
 - 显示名 = `overrides[id].name ?? preset.name ?? id`；
 - 组内会话按 `updatedAt` 倒序（v1 无组内拖拽）；
-- 组树布局：可见预设组按 `order` 顺序 → 隐藏预设组（置灰、不可拖拽、星标/隐藏外的操作照常，固定排在所有可见组之后，内部按 roster 顺序）→ “未分组”兜底组最后（工作区浏览器惯例）；`order` 只含可见项；
-- 可见性照搬官方：非 subagent、未归档、blank 仅当前；
+- 组树布局：可见预设组按 `order` 的可见子序列 → 隐藏预设组（置灰、不可拖拽、固定排在所有可见组之后，内部仍按完整 `order`）→ “未分组”兜底组最后；
+- Session 可见性与状态直接消费 ui-workspace 的官方投影（非 subagent、未归档、blank 仅当前、运行子代理与待交互状态），本插件不重建 `deriveFlat`；
 - `query`（浏览器搜索态）在 preset 模式下交给组树做标题过滤：组标题或组内会话标题匹配则保留组，非空时组内会话行同步过滤。
 
 ## 5. 使用的 RPC（全部现有，零新增）
@@ -142,13 +159,14 @@ derivePresetGroups(list, roster, order, archivedSessionIds, query)  // → 组�
 |---|---|---|
 | 读名单 | `agentPreset.list({})` | 分组树加载 / `connection/reset` / 本插件写后回读 |
 | 写默认（星标） | `settings.update({ ns:'agent-presets', patch:{ default: id } })` | 点星标 |
-| 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | 仅 I3（无星标且列表清空） |
+| 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | 仅 I3（无星标且全部隐藏） |
 | 默认被外部改 | `remote.$on('settings/document-updated', ns==='agent-presets')` → reconcile | 官方设置页与插件互相同步 |
-| 开新会话（+） | `workspaces.startSession(target)` → 空白会话 current 后 `agentPreset.select({ sessionId, agentPreset })` | 复用官方 seat 的 stage→apply 语义 |
+| 开新会话（+，复用空白） | `workspaces.startSession(target)` → 空白会话 current 后 `agentPreset.select({ sessionId, agentPreset })` | 工作区内已有可复用空白会话时 |
+| 开新会话（+，新建） | `session.create({ workspaceId, agentPreset })` → 名单回显后 `sessions.open(id)` | 创建即带预设：普通预设落到准备开始界面；warm-minimal 保持空白，等第一条真实用户消息进入 inbox 后才同步写入伪首轮 |
 | 打开会话 | `ctx.sessions.open(id)` | 现有服务动词 |
 | 排序/隐藏/改名 | 无 RPC，落 §4.1 的本地 store | 显示层数据 |
 
-**+ 按钮 workspace 目标**（照搬 `workspaces.startSession`）：当前会话所在 workspace → 最近 workspace → 无 workspace 则无操作（给出提示）。
+**+ 按钮 workspace 目标**：显式选择的工作区 → 当前会话所在工作区 → 最近工作区 → 无工作区则无操作（给出提示）。复用规则照搬 `connectWorkspace`（blank 且 cwd 等于工作区路径的成员会话；已跑过一轮的会话 blank 已翻 false，不会被误复用）。
 
 ## 6. 组件结构
 
@@ -158,12 +176,11 @@ src/client/
 ├── stores.ts           # createPresetManagerStore + actions（setOrder/reconcileOrder/setOverride）
 ├── roster.ts           # deriveRoster / derivePresetGroups / reconcile / planHide…（纯函数）
 ├── locales.ts          # presetManager 命名空间字典（zh/en）
-├── styles.ts           # 内联 CSS 字符串（--dsw-* token），首执行注入 <style>
-├── PresetGroups.tsx    # 分组树：搜索过滤(query) / 组行 / 拖拽 / 未分组
-├── PresetGroupRow.tsx  # 组头：★星标 / 名称+说明 / 会话数 / 展开 / + / ⋯ / 拖拽手柄
+├── styles.ts           # 仅插件装饰的内联 CSS（不复制官方行布局）
+├── PresetGroups.tsx    # 分组模型 + 官方行席位编排：搜索 / 折叠状态 / 拖拽顺序 / 未分组
+├── PresetRowDecorations.tsx # ★、说明/会话数、+ 与 ⋯；注入官方行的装饰席位
 ├── PresetMenu.tsx      # ⋯：重命名 / 隐藏(取消隐藏)
-├── RenameDialog.tsx    # 重命名（name + description）
-├── SessionRow.tsx      # 会话行：标题 / workspace 标签 / 运行点 / 时间
+├── RenameDialog.tsx    # 重命名（name + 多行 description textarea）
 └── SeatChip.tsx        # shadow 接管的新会话选择器
 ```
 
@@ -172,23 +189,23 @@ src/client/
 | 用户动作 | store 变化 | settings 同步 |
 |---|---|---|
 | 点 ★（可见预设） | 无 | `default = 该预设` |
-| 点 ★（隐藏预设） | 取消隐藏：追加到 `order` 末尾 | `default = 该预设` |
-| 隐藏（非星标） | 从 `order` 移除 | 无 |
+| 点 ★（隐藏预设） | 从 `hidden` 移除，`order` 不变 | `default = 该预设` |
+| 隐藏（非星标） | 加入 `hidden`，`order` 不变 | 无 |
 | 隐藏（星标预设） | **拒绝** + 提示"默认预设不能被隐藏，请先星标另一个预设" | 无 |
-| 全部隐藏 | 仅无星标时可能 | `mutate unset default` |
+| 全部隐藏 | 仅无星标时可能；`order` 仍完整 | `mutate unset default` |
 | 拖拽组行 | `order` 重排（与默认无关） | 无 |
 | 重命名 | `overrides` 更新 | 无 |
-| 外部改默认 | reconcile：若目标被隐藏则取消隐藏并追加 | 已成立 |
+| 外部改默认 | reconcile：若目标被隐藏则只取消 hidden | 已成立 |
 | 外部新建预设 | reconcile：追加到末尾（可见） | 无 |
 
-取消隐藏追加到末尾 = "隐藏顺序丢失"的已确认取舍；默认位置在列表里自由（星标与顺序解耦）。隐藏组行"置灰 + 排到显示末尾"是纯展示规则：`order` 只存可见项，隐藏项的顺序不保留。
+隐藏组行“置灰 + 排到显示末尾”只是展示规则；完整 `order` 始终保留隐藏项的位置，因此取消隐藏会回到原处。默认、顺序、可见性三者互相解耦。
 
 ## 7. 关键流程
 
-1. **启动/刷新**：load roster → reconcile（I1/I2）→ 渲染分组树（星标预设显示实心 ★）。
+1. **启动/刷新**：load roster → 原子 reconcile 生命周期与 I1/I2 → 发布 ready → 渲染分组树（星标预设显示实心 ★）。
 2. **星标切换**：写 `settings.default` → 回读 roster → 星标移动；隐藏预设上的星标同时取消隐藏。
-3. **隐藏**：从 `order` 移除 → 组行保留但**置灰并固定在显示列表末尾**（同工作区浏览器的归档交互）→ shadow chip 不再出现该预设；星标预设的隐藏被拒绝。
-4. **以预设开始新会话**：见 §5。
+3. **隐藏**：加入 `hidden`、不改 `order` → 组行**置灰并固定在显示列表末尾** → shadow chip 不再出现；切换视图或 reload 后保持，取消隐藏恢复原位置；星标预设的隐藏被拒绝。
+4. **以预设开始新会话**：见 §5（复用空白会话 → stage→apply；否则 `session.create` 带预设创建 → 回显后打开，落到准备开始界面）。
 5. **重命名**：对话框写 `overrides`；不改 id、不写 `preset.yml`。
 
 ## 8. 已知限制（v1）
@@ -222,7 +239,7 @@ src/client/
 ```
 dsh-preset-manager/
 ├── patches/
-│   └── harness-groupby-preset.patch   # ui-workspace 的 5 个文件（git apply 风格 unified diff）
+│   └── harness-groupby-preset.patch   # ui-workspace 扩展点与官方行 owner 契约（unified diff）
 ├── scripts/
 │   ├── build.sh        # junction 链接 checkout 依赖 + tsc + tsdown
 │   ├── setup.sh        # 补丁 --check+apply → 重建 ui-workspace bundle → 构建本插件 → dsh plugin add

@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# 安装 dsh-preset-manager：① 校验并应用 harness 补丁（ui-workspace 五个文件）→
-# ② 重建被改包 bundle → ③ 构建本插件 → ④ 注册进 profile（`dsh plugin add`）。
-#
-# 需要 dsh checkout（自动探测 DSH_CHECKOUT / /root/deepseek-harness /
-# ~/deepseek-harness）与 dsh CLI。尊重 DSH_PROFILE；缺省 web。重启 dsh web 生效。
-# 任一步失败即中止（set -e）。
+# Install dsh-preset-manager from a clean or already-patched Harness checkout.
+# The plugin repository owns the complete Host intervention as one tracked patch.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -21,34 +17,73 @@ if [ -z "${CHECKOUT:-}" ] || [ ! -d "$CHECKOUT/packages" ]; then
   echo "setup: cannot locate the dsh checkout (set DSH_CHECKOUT)" >&2
   exit 1
 fi
+if ! git -C "$CHECKOUT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "setup: $CHECKOUT is not a git checkout" >&2
+  exit 1
+fi
 
 PATCH="$REPO_DIR/patches/harness-groupby-preset.patch"
-if [ -f "$PATCH" ]; then
-  echo "checking harness patch against $CHECKOUT..."
-  if ! git -C "$CHECKOUT" apply --check "$PATCH"; then
-    echo "setup: the harness patch does not apply (dsh upgraded?) — adapt the patch first" >&2
-    exit 1
-  fi
-  if git -C "$CHECKOUT" apply --check --reverse "$PATCH" 2>/dev/null; then
-    echo "applying harness patch..."
-    git -C "$CHECKOUT" apply "$PATCH"
-  else
-    echo "harness patch already applied; skipping apply"
-  fi
-  echo "rebuilding ui-workspace bundle..."
-  (cd "$CHECKOUT" && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
+if [ ! -f "$PATCH" ]; then
+  echo "setup: tracked harness patch is missing: $PATCH" >&2
+  exit 1
 fi
+
+PATCH_SHA="$(sha256sum "$PATCH" | awk '{print $1}')"
+STATE_FILE="$(git -C "$CHECKOUT" rev-parse --git-path dsh-preset-manager.patch-state)"
+if [[ "$STATE_FILE" != /* ]]; then STATE_FILE="$CHECKOUT/$STATE_FILE"; fi
+RECORDED_SHA=""
+RECORDED_OWNED=""
+if [ -f "$STATE_FILE" ]; then
+  RECORDED_SHA="$(sed -n 's/^patch_sha256=//p' "$STATE_FILE")"
+  RECORDED_OWNED="$(sed -n 's/^patch_applied_by_setup=//p' "$STATE_FILE")"
+fi
+PATCH_APPLIED_BY_SETUP=false
+
+echo "checking tracked harness patch against $CHECKOUT..."
+if git -C "$CHECKOUT" apply --check --reverse "$PATCH" 2>/dev/null; then
+  if [ "$RECORDED_SHA" = "$PATCH_SHA" ] && [ "$RECORDED_OWNED" = "true" ]; then
+    PATCH_APPLIED_BY_SETUP=true
+    echo "harness patch already applied by an earlier run of this exact setup"
+  else
+    echo "harness patch already present; preserving external ownership"
+  fi
+elif git -C "$CHECKOUT" apply --check "$PATCH"; then
+  echo "applying harness patch..."
+  git -C "$CHECKOUT" apply "$PATCH"
+  PATCH_APPLIED_BY_SETUP=true
+else
+  echo "setup: neither the patch nor its exact reverse applies" >&2
+  echo "setup: the target files overlap local changes or this DSH revision is unsupported" >&2
+  echo "setup: no Host files were changed" >&2
+  exit 1
+fi
+
+{
+  echo "patch_sha256=$PATCH_SHA"
+  echo "patch_applied_by_setup=$PATCH_APPLIED_BY_SETUP"
+  echo "host_head=$(git -C "$CHECKOUT" rev-parse HEAD)"
+} > "$STATE_FILE"
+
+echo "rebuilding ui-workspace bundle..."
+(cd "$CHECKOUT" && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
 
 echo "building dsh-preset-manager..."
 bash "$REPO_DIR/scripts/build.sh"
 
+CHECKOUT_CLI="$CHECKOUT/apps/cli/lib/bin.js"
 if command -v dsh >/dev/null 2>&1; then
   echo "registering bundle into profile '$PROFILE'..."
   (cd "$REPO_DIR" && dsh plugin --profile "$PROFILE" add .)
+elif command -v node >/dev/null 2>&1 && [ -f "$CHECKOUT_CLI" ]; then
+  echo "registering bundle through the checkout CLI into profile '$PROFILE'..."
+  (cd "$REPO_DIR" && node "$CHECKOUT_CLI" plugin --profile "$PROFILE" add .)
+elif command -v pnpm >/dev/null 2>&1; then
+  echo "registering bundle through pnpm into profile '$PROFILE'..."
+  (cd "$REPO_DIR" && pnpm --dir "$CHECKOUT" dsh plugin --profile "$PROFILE" add .)
 else
-  echo "dsh CLI not found; register the bundle manually from this repo:"
-  echo "  dsh plugin --profile $PROFILE add ."
+  echo "neither dsh nor pnpm is available; register the bundle manually:" >&2
+  echo "  cd $CHECKOUT && pnpm dsh plugin --profile $PROFILE add $REPO_DIR" >&2
 fi
 
 echo
-echo "Restart dsh web; the workspace view-options menu then offers the third item 按预设."
+echo "Restart dsh web; the workspace view-options menu then offers 按预设."

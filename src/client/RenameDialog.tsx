@@ -72,17 +72,14 @@ export function RenameDialog({ entry, onConfirm, onClose, t }: RenameDialogProps
         </div>
         <div className={css.renameField}>
           <label className={css.renameLabel} htmlFor="pm-rename-desc">{t('field.description')}</label>
-          <input
+          {/* Multi-line: descriptions run long; Enter inserts a newline here
+              and only the save button (or the name field's Enter) confirms. */}
+          <textarea
             id="pm-rename-desc"
-            className={css.renameInput}
+            className={css.renameTextarea}
             value={description}
+            rows={4}
             onChange={(e) => { setDescription(e.target.value) }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !composing.current) {
-                e.preventDefault()
-                confirm()
-              }
-            }}
           />
         </div>
       </div>

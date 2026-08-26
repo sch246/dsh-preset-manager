@@ -1,4 +1,4 @@
-import type { SessionId, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
+import type { SessionId, SnapshotStore, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client';
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots';
 import type { PresetManagerState, RosterSnapshot } from './roster.ts';
 import type { PresetManagerKey } from './locales.ts';
@@ -14,11 +14,11 @@ export interface PresetGroupsInjected {
     /** Open a real Session. */
     open: (sessionId: SessionId) => void;
     /**
-     * Stage a preset for the next session and start it in the current/recent
-     * workspace; returns a message key (translated by the tree) when no
-     * workspace can take the session.
+     * Stage a preset for the next session and start it in the chosen (or
+     * resolved) workspace; returns a message key (translated by the tree) when
+     * no workspace can take the session or the create failed.
      */
-    startSessionByPreset: (id: string) => PresetManagerKey | undefined;
+    startSessionByPreset: (id: string, workspaceId?: WorkspaceId) => Promise<PresetManagerKey | undefined>;
     /** Star a preset (unhiding it first when hidden), then write settings. */
     setDefault: (state: PresetManagerState, id: string) => Promise<PresetManagerKey | undefined>;
     /** Hide a preset (rejected for the starred one; I3 unset may follow). */
@@ -38,4 +38,4 @@ export type PresetGroupsProps = PropsRuntime<'sidebar.workspaces.presetGroups'> 
  * @param props - composed slot props.
  * @returns the tree element.
  */
-export declare function PresetGroups({ query, useSessions, useWorkspaces, useStore, actions, useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t, }: PresetGroupsProps): import("react").JSX.Element;
+export declare function PresetGroups({ query, rows, sessionActions, useSessions, useWorkspaces, useStore, actions, useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t, }: PresetGroupsProps): import("react").JSX.Element;

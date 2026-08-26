@@ -1,7 +1,8 @@
 /**
  * dsh-preset-manager browser half.
  *
- * Two registrations over one shared store (`dsh.presetManager.v1`, one root
+ * Two registrations over one shared store (historical storage key
+ * `dsh.presetManager.v1`, explicit schema v2, one root
  * instance):
  * - `sidebar.workspaces.presetGroups` fills the patched ui-workspace child
  *   slot (the whole preset-mode tree: visible groups in order, hidden groups
@@ -22,7 +23,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { IApiClient } from '@deepseek-ai/dsh-host-apiproxy/client'
-import type { ClientContext, SessionId, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionId, SnapshotStore, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the patched ui-workspace SlotMap merge (the child slot).
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -77,7 +78,7 @@ async function unsetDefaultPreset(api: Pick<IApiClient, 'settings'>): Promise<vo
 
 /**
  * Roster read + management sequencing. Pure decisions live in roster.ts;
- * this controller only sequences writes: order first (when needed), settings
+ * this controller only sequences visibility first (when needed), settings
  * second, then re-read (DESIGN.md §4.2) — every path is idempotent because
  * reconcile re-establishes I1/I2 on the echo.
  */
@@ -108,15 +109,18 @@ class RosterController {
       this.set({ status: 'error', error: messageOf(error), presets: [] })
       return
     }
+    // Publish ready only after the store has atomically classified and folded
+    // fresh / legacy / current state. This prevents a one-render visibility
+    // flash while a whole-object legacy snapshot is still unreconciled.
+    actions?.reconcileState(presets)
     this.set({ status: 'ready', error: null, presets })
-    actions?.reconcileOrder(presets)
   }
 
   /** Star a preset: unhide it first when hidden (I1), then write settings. */
   async setDefault(actions: PresetManagerBakedActions, state: PresetManagerState, id: string): Promise<PresetManagerKey | undefined> {
     const { presets } = this.store.getSnapshot()
     if (!presets.some(preset => preset.id === id)) return 'action.failed'
-    if (!state.order.includes(id)) actions.setOrder([...state.order, id])
+    if ((state.hidden ?? []).includes(id)) actions.setHidden(planUnhide(state.hidden, id))
     const failure = await writeDefaultPreset(this.api, id)
     if (failure !== undefined) return 'action.failed'
     await this.load(actions)
@@ -126,16 +130,16 @@ class RosterController {
   /** Hide a preset; the starred one is rejected (I1), and I3 may unset the default. */
   async hide(actions: PresetManagerBakedActions, state: PresetManagerState, id: string): Promise<PresetManagerKey | undefined> {
     const { presets } = this.store.getSnapshot()
-    const plan = planHide(presets, state.order, id)
+    const plan = planHide(presets, state.hidden ?? [], id)
     if (!plan.ok) return 'hide.rejected'
-    actions.setOrder(plan.order)
-    if (shouldUnsetDefault(presets, plan.order)) await unsetDefaultPreset(this.api)
+    actions.setHidden(plan.hidden)
+    if (shouldUnsetDefault(presets, state.order, plan.hidden)) await unsetDefaultPreset(this.api)
     return undefined
   }
 
-  /** Unhide: append at the end of the list (hidden positions are not kept). */
+  /** Unhide without moving the preset's stable order position. */
   async unhide(actions: PresetManagerBakedActions, state: PresetManagerState, id: string): Promise<void> {
-    actions.setOrder(planUnhide(state.order, id))
+    actions.setHidden(planUnhide(state.hidden ?? [], id))
   }
 
   /** Write the display name/description override (store only). */
@@ -166,6 +170,13 @@ class SeatController {
   private fallback = ''
   /** Set while a pick is waiting for a session; cleared once applied. */
   private staged: string | undefined
+  /**
+   * Set while the + flow is waiting for the NEXT blank session: unlike a
+   * hero-chip pick (which dies when a started session is current), this
+   * stage must survive the running conversation until the workspace connect
+   * makes its blank session current.
+   */
+  private pendingApply = false
 
   constructor(
     private readonly api: Pick<IApiClient, 'agentPresets'>,
@@ -201,6 +212,7 @@ class SeatController {
   /** Stage one preset for the next session, applying immediately when a blank session is current. */
   async select(id: string): Promise<void> {
     if (this.store.getSnapshot().busy) return
+    this.pendingApply = false
     this.stage(id)
     await this.apply()
   }
@@ -211,12 +223,28 @@ class SeatController {
     this.set({ current: id, error: null })
   }
 
+  /**
+   * The + flow's stage: set before the workspace connect, applied by the
+   * list-change applier once the connect's blank session becomes current.
+   * The stage survives intermediate non-blank currents (the running
+   * conversation the user is leaving), so the pick cannot be lost mid-flight.
+   */
+  stageForNext(id: string): void {
+    this.staged = id
+    this.pendingApply = true
+    this.set({ current: id, error: null })
+  }
+
   /** Hand the staged choice to the current session, if there is one to take it. */
   async apply(): Promise<void> {
     const staged = this.staged
     const session = this.currentSession()
     if (staged === undefined || session === undefined) return
-    if (!session.blank || session.agentPreset === staged) {
+    // A + flow stage waits for the blank session the connect is about to
+    // produce; the still-current started conversation must not consume it.
+    if (this.pendingApply) {
+      if (!session.blank) return
+    } else if (!session.blank || session.agentPreset === staged) {
       this.staged = undefined
       return
     }
@@ -224,6 +252,7 @@ class SeatController {
     try {
       const response = await this.api.agentPresets.select({ sessionId: session.id, agentPreset: staged })
       this.staged = undefined
+      this.pendingApply = false
       if (!response.result.ok) {
         this.set({ busy: false, error: response.result.error.message, current: this.fallback })
         return
@@ -232,6 +261,7 @@ class SeatController {
       this.onApplied?.(session.id as string, response.result.value.agentPreset)
     } catch (error) {
       this.staged = undefined
+      this.pendingApply = false
       this.set({ busy: false, error: messageOf(error), current: this.fallback })
     }
   }
@@ -254,7 +284,7 @@ export function apply(ctx: ClientContext): void {
   // Latest baked actions, set by whichever registration's inject factory ran;
   // event-driven reconciles use it, and a mount-time load() covers the rest.
   let currentActions: PresetManagerBakedActions | undefined
-  let startSessionByPreset: (id: string) => PresetManagerKey | undefined = () => 'action.failed'
+  let startSessionByPreset: (id: string, workspaceId?: WorkspaceId) => Promise<PresetManagerKey | undefined> = async () => 'action.failed'
   let seatRef: SeatController | undefined
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-preset-manager: dictionaries')
@@ -280,7 +310,7 @@ export function apply(ctx: ClientContext): void {
       hooks: { roster: controller.store },
       load: () => controller.load(actions),
       open: (sessionId) => { ctx.sessions.open(sessionId) },
-      startSessionByPreset: id => startSessionByPreset(id),
+      startSessionByPreset: (id, workspaceId) => startSessionByPreset(id, workspaceId),
       setDefault: (state, id) => controller.setDefault(actions, state, id),
       hide: (state, id) => controller.hide(actions, state, id),
       unhide: (state, id) => controller.unhide(actions, state, id),
@@ -322,20 +352,72 @@ export function apply(ctx: ClientContext): void {
       },
     )
     seatRef = seatCtl
-    // The tree's + button: stage the pick, then start the session it lands on
-    // (the list-change applier composes the blank session the workspace
-    // connect produces or reuses). No workspace at all → a hint, no action.
-    startSessionByPreset = (id: string): PresetManagerKey | undefined => {
+    /** Wait until the sessions list mirror carries a freshly created session. */
+    const waitForListed = (sessionId: SessionId, timeoutMs = 3000): Promise<boolean> => {
+      const snapshot = scope.sessions.list.getSnapshot()
+      if (snapshot.byId[sessionId] !== undefined) return Promise.resolve(true)
+      return new Promise((resolve) => {
+        let settled = false
+        const timer = window.setTimeout(() => { finish(false) }, timeoutMs)
+        const stop = scope.sessions.list.subscribe(() => {
+          if (scope.sessions.list.getSnapshot().byId[sessionId] !== undefined) finish(true)
+        })
+        const finish = (ok: boolean): void => {
+          if (settled) return
+          settled = true
+          stop()
+          window.clearTimeout(timer)
+          resolve(ok)
+        }
+      })
+    }
+    // The tree's + button: resolve the workspace (explicit pick → current →
+    // recent), then either reuse its provisional blank session (staged preset
+    // applies on the connect echo) or create the session WITH the chosen
+    // preset — the preset identity is available before the session opens.
+    // Ordinary presets land on the ready-to-start composer; warm-minimal stays
+    // blank until its first real user input reaches the inbox. No workspace at
+    // all → a hint, no action.
+    startSessionByPreset = async (id: string, workspaceId?: WorkspaceId): Promise<PresetManagerKey | undefined> => {
       const workspaces = scope.workspaces.list.getSnapshot()
       const sessions = scope.sessions.list.getSnapshot()
       const currentWorkspaceId = sessions.current === undefined
         ? undefined
         : workspaces.items.find(workspace => workspace.sessionIds.includes(sessions.current as SessionId))?.workspaceId
-      const target = currentWorkspaceId ?? workspaces.recentWorkspaceId
+      const target = workspaceId ?? currentWorkspaceId ?? workspaces.recentWorkspaceId
       if (target === undefined) return 'start.noWorkspace'
-      seatRef?.stage(id)
-      scope.workspaces.startSession()
-      return undefined
+      const workspace = workspaces.items.find(item => item.workspaceId === target)
+      // Reuse rule mirrors the official New Session flow: a blank member with
+      // the canonical cwd. Once warm-minimal seeds after the first real input,
+      // its turn/start flips blank off, so a started conversation is never
+      // reused as "new".
+      const reusable = workspace === undefined
+        ? undefined
+        : sessions.ids.find(id => {
+          const summary = sessions.byId[id]
+          return summary !== undefined && summary.blank
+            && summary.cwd === workspace.path
+            && workspace.sessionIds.includes(summary.id)
+            && !workspaces.archivedSessionIds.includes(summary.id)
+        })
+      if (reusable !== undefined) {
+        seatRef?.stageForNext(id)
+        scope.workspaces.startSession(target)
+        return undefined
+      }
+      try {
+        const response = await scopeApi.sessions.create({ workspaceId: target, agentPreset: id })
+        if (!response.result.ok) return 'action.failed'
+        const created = response.result.value.sessionId
+        if (!(await waitForListed(created))) return 'action.failed'
+        scope.sessions.open(created)
+        // The created session already carries the preset; the chip only
+        // needs to mirror it (no stage to apply).
+        void seatRef?.load()
+        return undefined
+      } catch (error) {
+        return 'action.failed'
+      }
     }
 
     scope.effect(() => {

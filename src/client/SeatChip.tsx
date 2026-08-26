@@ -79,8 +79,11 @@ export function SeatChip({ useRoster, useStore, useSeat, load, select, t }: Seat
     [rosterSnapshot.presets, state],
   )
   const chosen = options.find(option => option.id === seat.current) ?? options[0]
-  if (chosen === undefined) return null
+  // Declared before the early return: an empty roster renders the chip with
+  // no menu, and the hook count must not change when options arrive later
+  // (a conditional hook order crashes React and abdicates the seat entry).
   const [open, setOpen] = useState(false)
+  if (chosen === undefined) return null
 
   return (
     <Menu

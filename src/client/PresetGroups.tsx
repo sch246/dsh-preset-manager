@@ -5,19 +5,17 @@
  * whole display layer (star / drag / hide / unhide / rename / new session)
  * through the injected face; all derivation stays in roster.ts.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { SessionId, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId, SnapshotStore, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-// Type-only: pulls the ui-workspace SlotMap merge (the patched child slot).
-import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { GroupNode } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { PresetManagerState, PresetGroupNode, RosterEntry, RosterSnapshot } from './roster.ts'
 import type { PresetManagerKey } from './locales.ts'
 import { derivePresetGroups, deriveRoster } from './roster.ts'
 import type { createPresetManagerStore } from './stores.ts'
-import { PresetGroupRow, type PresetGroupDragState } from './PresetGroupRow.tsx'
+import { PresetRowActions, PresetRowMeta, PresetStar } from './PresetRowDecorations.tsx'
 import { RenameDialog } from './RenameDialog.tsx'
-import { SessionRow } from './SessionRow.tsx'
 import { css } from './styles.ts'
 
 /** Session rows visible per group before the local overflow control. */
@@ -34,11 +32,11 @@ export interface PresetGroupsInjected {
   /** Open a real Session. */
   open: (sessionId: SessionId) => void
   /**
-   * Stage a preset for the next session and start it in the current/recent
-   * workspace; returns a message key (translated by the tree) when no
-   * workspace can take the session.
+   * Stage a preset for the next session and start it in the chosen (or
+   * resolved) workspace; returns a message key (translated by the tree) when
+   * no workspace can take the session or the create failed.
    */
-  startSessionByPreset: (id: string) => PresetManagerKey | undefined
+  startSessionByPreset: (id: string, workspaceId?: WorkspaceId) => Promise<PresetManagerKey | undefined>
   /** Star a preset (unhiding it first when hidden), then write settings. */
   setDefault: (state: PresetManagerState, id: string) => Promise<PresetManagerKey | undefined>
   /** Hide a preset (rejected for the starred one; I3 unset may follow). */
@@ -47,6 +45,12 @@ export interface PresetGroupsInjected {
   unhide: (state: PresetManagerState, id: string) => Promise<void>
   /** Write the display name/description override. */
   rename: (id: string, override: { name: string; description: string }) => Promise<void>
+}
+
+/** In-flight drag marker for one preset project section. */
+interface PresetGroupDragState {
+  sourceId: string
+  over: { id: string; half: 'before' | 'after' } | null
 }
 
 /** Full component props: patched owner share + store + inject face + locale. */
@@ -74,20 +78,13 @@ function useNativeDragAcceptance(active: boolean): void {
   }, [active])
 }
 
-/** Basename of a session cwd, the workspace-label fallback outside every workspace. */
-function cwdLabel(cwd: string | undefined): string | undefined {
-  if (cwd === undefined || cwd === '') return undefined
-  const base = cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop()
-  return base !== undefined && base !== '' ? base : cwd
-}
-
 /**
  * Render the preset group tree.
  * @param props - composed slot props.
  * @returns the tree element.
  */
 export function PresetGroups({
-  query, useSessions, useWorkspaces, useStore, actions,
+  query, rows, sessionActions, useSessions, useWorkspaces, useStore, actions,
   useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t,
 }: PresetGroupsProps) {
   const list = useSessions(snapshot => snapshot)
@@ -97,6 +94,7 @@ export function PresetGroups({
   const rosterSnapshot = useRoster(snapshot => snapshot)
 
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
+  const [expandedSessionGroups, setExpandedSessionGroups] = useState<string[]>([])
   const [drag, setDrag] = useState<PresetGroupDragState | null>(null)
   const dropCommitted = useRef(false)
   const [notice, setNotice] = useState<PresetManagerKey | null>(null)
@@ -120,9 +118,13 @@ export function PresetGroups({
     () => deriveRoster(rosterSnapshot.presets, state),
     [rosterSnapshot.presets, state],
   )
+  const sessionNodes = useMemo(
+    () => rows.deriveSessions(list, archivedSessionIds),
+    [rows, list, archivedSessionIds],
+  )
   const groups = useMemo(
-    () => derivePresetGroups(list, roster, state.order, archivedSessionIds, query),
-    [list, roster, state.order, archivedSessionIds, query],
+    () => derivePresetGroups(list, sessionNodes, roster, state.order, query),
+    [list, sessionNodes, roster, state.order, query],
   )
   const workspaceBySession = useMemo(() => {
     const map = new Map<string, string>()
@@ -136,17 +138,21 @@ export function PresetGroups({
   const workspaceLabelOf = (sessionId: SessionId): string | undefined => {
     const listed = workspaceBySession.get(sessionId as string)
     if (listed !== undefined) return listed
-    return cwdLabel(list.byId[sessionId]?.cwd)
+    const cwd = list.byId[sessionId]?.cwd
+    return cwd === undefined || cwd === '' ? undefined : rows.workspaceLabel(cwd)
   }
+  const workspaceChoices = useMemo(
+    () => workspaceItems.map(workspace => ({ id: workspace.workspaceId, title: workspace.title })),
+    [workspaceItems],
+  )
 
-  // Default expansion: the current-session group and the first visible group
-  // open once; the rest keep the five-session preview.
+  // Match the official browser: only the current session's group opens
+  // automatically; every closed group contains no session preview.
   useEffect(() => {
     if (list.phase !== 'ready' || expandedInitialized.current || groups.length === 0) return
     expandedInitialized.current = true
     const currentGroup = groups.find(group => group.sessions.some(node => node.id === list.current))?.key
-    const firstVisible = groups.find(group => group.presetId !== undefined && !group.hidden)?.key
-    setExpandedGroups([currentGroup, firstVisible].filter((key): key is string => key !== undefined))
+    setExpandedGroups(currentGroup === undefined ? [] : [currentGroup])
   }, [list, groups])
 
   const commitDrag = (active: PresetGroupDragState, over: NonNullable<PresetGroupDragState['over']>): void => {
@@ -202,79 +208,117 @@ export function PresetGroups({
         {status}
         {groups.map((group: PresetGroupNode) => {
           const expanded = expandedGroups.includes(group.key)
-          const shown = expanded ? group.sessions : group.sessions.slice(0, COLLAPSED_SESSION_LIMIT)
+          const overflowExpanded = expandedSessionGroups.includes(group.key)
+          const shown = !expanded
+            ? []
+            : overflowExpanded
+              ? group.sessions
+              : group.sessions.slice(0, COLLAPSED_SESSION_LIMIT)
           const entry = group.presetId === undefined ? undefined : roster.find(r => r.id === group.presetId)
           const marker = drag !== null && drag.over?.id === group.key ? drag.over.half : null
-          return (
-            <div key={group.key} className={css.group}>
-              <PresetGroupRow
+          const canDrag = group.presetId !== undefined && !group.hidden
+          const row: GroupNode = {
+            key: group.key,
+            workspaceId: undefined,
+            cwd: undefined,
+            createdAt: undefined,
+            label: group.label,
+            sessionCount: group.sessionCount,
+            expanded,
+            containsCurrent: group.sessions.some(node => node.id === list.current),
+            sessions: expanded ? group.sessions : [],
+          }
+          const projectRow = rows.renderProjectRow({
+            group: row,
+            label: group.presetId === undefined ? t('group.ungrouped') : group.label,
+            muted: group.hidden,
+            leading: group.presetId === undefined
+              ? undefined
+              : <PresetStar
+                active={group.isDefault}
+                onSelect={() => {
+                  if (group.isDefault) return
+                  run(setDefault(state, group.presetId as string))
+                }}
+                t={t}
+              />,
+            meta: group.presetId === undefined ? undefined : <PresetRowMeta group={group} t={t} />,
+            rowActions: group.presetId === undefined
+              ? undefined
+              : <PresetRowActions
                 group={group}
-                expanded={expanded}
-                dragging={drag !== null}
-                source={drag !== null && drag.sourceId === group.key}
-                marker={marker}
-                onDragStart={() => {
+                workspaces={workspaceChoices}
+                onStartSession={(workspaceId) => {
+                  void startSessionByPreset(group.presetId as string, workspaceId).then((key) => {
+                    if (key !== undefined) showNotice(key)
+                  })
+                }}
+                onRename={() => { if (entry !== undefined) setRenameTarget(entry) }}
+                onHide={() => { run(hide(state, group.presetId as string)) }}
+                onUnhide={() => { void unhide(state, group.presetId as string) }}
+                t={t}
+              />,
+            drag: !canDrag
+              ? undefined
+              : {
+                start: () => {
                   dropCommitted.current = false
                   setDrag({ sourceId: group.key, over: null })
-                }}
-                onDragHover={(half) => {
-                  setDrag(active => active === null ? active : { ...active, over: { id: group.key, half } })
-                }}
-                onDrop={(half) => {
-                  if (drag !== null) commitDrag(drag, { id: group.key, half })
-                }}
-                onDragEnd={() => {
+                },
+                end: () => {
                   if (drag !== null && drag.over !== null) commitDrag(drag, drag.over)
                   else setDrag(null)
                   dropCommitted.current = false
-                }}
-                onToggle={() => { toggle(group.key) }}
-                onStartSession={() => {
-                  if (group.presetId === undefined) return
-                  const key = startSessionByPreset(group.presetId)
-                  if (key !== undefined) showNotice(key)
-                }}
-                onSetDefault={() => {
-                  if (group.presetId === undefined || group.isDefault) return
-                  run(setDefault(state, group.presetId))
-                }}
-                onRename={() => {
-                  if (entry !== undefined) setRenameTarget(entry)
-                }}
-                onHide={() => {
-                  if (group.presetId === undefined) return
-                  run(hide(state, group.presetId))
-                }}
-                onUnhide={() => {
-                  if (group.presetId === undefined) return
-                  void unhide(state, group.presetId)
-                }}
-                t={t}
-              />
-              {shown.map(node => (
-                <SessionRow
-                  key={node.id as string}
-                  node={node}
-                  current={node.id === list.current}
-                  workspace={workspaceLabelOf(node.id)}
-                  now={now}
-                  onOpen={open}
-                  t={t}
-                />
-              ))}
-              {group.sessions.length > COLLAPSED_SESSION_LIMIT && (
-                <button
-                  type="button"
-                  className={css.overflow}
-                  aria-expanded={expanded}
-                  onClick={() => { toggle(group.key) }}
-                >
-                  {expanded
-                    ? t('sessions.collapse')
-                    : t('sessions.expand', { n: group.sessions.length - COLLAPSED_SESSION_LIMIT })}
-                </button>
-              )}
-            </div>
+                },
+              },
+            onToggle: () => {
+              if (expanded) {
+                setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
+              }
+              toggle(group.key)
+            },
+          })
+          const sessionRows = shown.map(node => (
+            <Fragment key={node.id as string}>
+              {rows.renderSessionRow({
+                node,
+                currentId: list.current,
+                now,
+                meta: workspaceLabelOf(node.id),
+                onOpen: open,
+                ...sessionActions,
+              })}
+            </Fragment>
+          ))
+          const overflow = expanded && group.sessions.length > COLLAPSED_SESSION_LIMIT
+            ? rows.renderSessionOverflow({
+              expanded: overflowExpanded,
+              remaining: group.sessions.length - COLLAPSED_SESSION_LIMIT,
+              onToggle: () => {
+                setExpandedSessionGroups(keys => keys.includes(group.key)
+                  ? keys.filter(key => key !== group.key)
+                  : [...keys, group.key])
+              },
+            })
+            : null
+          return (
+            <Fragment key={group.key}>
+              {rows.renderProjectGroup({
+                drag: !canDrag
+                  ? undefined
+                  : {
+                    active: drag !== null,
+                    marker,
+                    hover: (half) => {
+                      setDrag(active => active === null ? active : { ...active, over: { id: group.key, half } })
+                    },
+                    drop: (half) => {
+                      if (drag !== null) commitDrag(drag, { id: group.key, half })
+                    },
+                  },
+                children: <>{projectRow}{sessionRows}{overflow}</>,
+              })}
+            </Fragment>
           )
         })}
       </div>

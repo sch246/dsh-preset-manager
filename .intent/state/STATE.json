@@ -1,0 +1,42 @@
+{
+  "$schema": "meta-intent/0.2/state",
+  "id": "dsh-preset-manager",
+  "revision": "0.1.0-draft.7",
+  "status": "draft",
+  "document": "STATE.md",
+  "logs": [
+    "../logs/2026-08-26-source-and-verbatim-audit.md",
+    "../logs/2026-08-26-reconstructed-product-intent.md",
+    "../logs/2026-08-26-reconstruction-verification.md",
+    "../logs/2026-08-26-user-original-intent.md",
+    "../logs/2026-08-26-description-and-create-flow-clarification.md",
+    "../logs/2026-08-26-session-actions-repair-and-adapter-direction.md",
+    "../logs/2026-08-26-dsh-std-non-adoption.md",
+    "../logs/2026-08-26-preexisting-patch-ownership-repair.md"
+  ],
+  "protocol": {
+    "id": "meta-intent",
+    "revision": "0.2",
+    "package": "meta-intent",
+    "uri": "https://github.com/sch246/meta-intent.git",
+    "lock": "locks/protocol-0.2/LOCK.json",
+    "artifactDigest": "sha256:a5ce1e0acacac0e313f3f281256cd79d5d6aa2ba6cf7a5e62af7a385df2539fe"
+  },
+  "resources": [
+    {
+      "id": "repository.dsh-preset-manager",
+      "kind": "git-repository",
+      "uri": "https://github.com/sch246/dsh-preset-manager.git",
+      "revision": "44c3a9eaecfe1c3fe4aaaf160436f8d673b7dca1",
+      "scope": "historical committed baseline before the current v4 implementation; exact current realization binding remains pending"
+    },
+    {
+      "id": "target.deepseek-harness",
+      "kind": "git-checkout",
+      "uri": "file:///root/deepseek-harness",
+      "scope": "local-bootstrap-and-compatibility-investigation"
+    }
+  ],
+  "activeLocks": [],
+  "candidateLocks": []
+}

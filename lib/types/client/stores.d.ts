@@ -1,6 +1,6 @@
 /**
- * The plugin's viewing store: the ordered visible list and the display
- * overrides. Module level exports the factory only (a module-level handle
+ * The plugin's viewing store: complete order, independent hidden ids, and
+ * display overrides. Module level exports the factory only (a module-level handle
  * would pin the store identity across plugin reloads); both registrations
  * (the preset tree and the shadow seat chip) receive the same handle, so the
  * framework resolves ONE root instance they share.
@@ -13,10 +13,12 @@ import type { PresetManagerState } from './roster.ts';
  * return type); drift fails assignability at the defineStore call.
  */
 export type PresetManagerActions = {
-    /** Replace the whole visible order (drag commit, hide/unhide plans). */
+    /** Replace the complete order (drag commit). */
     setOrder: (draft: PresetManagerState, order: string[]) => void;
-    /** Fold the order against the current roster so I1/I2 hold (reconcile). */
-    reconcileOrder: (draft: PresetManagerState, presets: readonly {
+    /** Replace hidden ids without moving their stable order positions. */
+    setHidden: (draft: PresetManagerState, hidden: string[]) => void;
+    /** Fold order/visibility against the roster and migrate old v1 snapshots. */
+    reconcileState: (draft: PresetManagerState, presets: readonly {
         id: string;
         isDefault: boolean;
     }[]) => void;

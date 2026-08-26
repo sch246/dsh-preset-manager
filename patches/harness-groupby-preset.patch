@@ -1,7 +1,313 @@
-diff -ruN a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages/client/ui-workspace/src/client/contract/slots.ts
---- a/packages/client/ui-workspace/src/client/contract/slots.ts	2026-08-24 14:19:53.141981895 +0800
-+++ b/packages/client/ui-workspace/src/client/contract/slots.ts	2026-08-24 14:19:53.174982427 +0800
-@@ -57,6 +57,8 @@
+diff --git a/packages/client/ui-workspace/README.md b/packages/client/ui-workspace/README.md
+index 041c886ae3..1715ace687 100644
+--- a/packages/client/ui-workspace/README.md
++++ b/packages/client/ui-workspace/README.md
+@@ -6,6 +6,8 @@ Shared Workspace browser and picker plugin. `WorkspaceBrowser` fills the sidebar
+
+ The browser renders grouped or flat Session rows from the global runtime hooks and owns Workspace add/rename/reorder plus Session reorder. A Workspace remembers whether it is closed or showing Sessions; an open Workspace shows five Sessions by default, offers a transient **Show more** control for the remainder, and returns to five after the whole Workspace is closed and reopened. Creating a Session from a Workspace row first opens that group so the new row remains visible when the Session state arrives. Once the Workspace list baseline is ready, browser-persisted expansion and Session-order records retain only current Workspace ids plus Ungrouped and the flat-list account. View options combine grouping with one browser-persisted Session order per account: real Workspaces initialize from `WorkspaceView.sessionIds`, while Ungrouped and the cross-Workspace flat list initialize from recency. **Manual** and **Last updated** apply in either presentation. Entering Last updated performs a complete recency sort and later user prompts or steers promote their Session once, while entering Manual preserves every current position and disables later promotion. Dragging edits the current order in either mode; Manual-mode drags for real Workspaces also update the Host Session account, while Ungrouped and flat-list orders remain browser-local because neither has one Workspace account. Flat rows omit the empty leading status slot because they have no parent hierarchy, but retain it when a Session status is visible. Workspace drag order is Host-durable in either Session order mode.
+
++An alternate grouping registered in `sidebar.workspaces.presetGroups` receives the official Session projection, row render seats, and required rename/fork/archive callbacks from the browser owner. It can add a group identity, metadata, and actions, but it does not import or clone Workspace row implementations; collapse, overflow, activity animation, menus, spacing, and whole-group drag previews therefore retain one authority in this package.
++
+ Collapsed search is one header action beside the view and add actions. In the rail, add and search render as 36px controls on the shell's shared horizontal entry path. Activating search expands the field across the header; an outside click collapses only a query that is empty after trimming — except while the rail search gesture is still in flight (until focus lands in the input after the column slide), so the expanding click cannot dismiss the search it opened — while the clear control always resets and collapses it. A non-blank search query replaces either browsing mode with one flat result list: case-insensitive title and Workspace substring matches appear immediately, while a 250 ms debounced Host request adds ranked current-conversation content matches and snippets. The English search input and its defensive request path remove NUL, cap the query at the wire schema's 500 UTF-16 code units without splitting a surrogate pair, and preserve the existing debounce and cancellation behavior. Each new query aborts the preceding request; a failed content search leaves metadata matches visible with a warning. The list is capped at 20, asks the user to narrow broader queries, and opens the selected Session without clearing the query or jumping to a specific event.
+
+ The picker lists real Host Workspace entities through the global `useWorkspaces` hook. Selecting a Workspace invokes the slot owner's `onPick` callback to retarget the frontend Session object. Distinct canonical paths remain separate id-keyed Workspaces when their basenames and display titles match; the sidebar hover detail shows a POSIX home or descendant as `~` / `~/…` and leaves a Windows path verbatim. Each registration declares a **directory-flow child hole** (`single` kind: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) that the composed picker package's client half fills with its picking interaction — the [`-native`](../../host/directory-picker-native/README.md) backend's renderless OS-chooser driver today, an in-app browsing dialog under a `-browse` composition. The flat **Add workspace...** action renders only while the surface's hole is occupied (occupancy read per menu render; an empty hole means the composition has no picking affordance — the seam's documented no-flow default, under which the sidebar header drops its add button rather than offering a dead one). This package owns the trigger and the adoption: the occupant reports one picked path per open through the hole's owner conversation (`open`/`busy`/`onPicked`/`onCancel`/`onError`), and the owner adopts it through the object layer, selecting the committed Workspace only after its list projection has refreshed; cancellation is silent, and errors land in the retryable folder dialog whose **Choose again** reopens the flow. Adding has exactly one route: the occupant's own create-folder affordance already covers a brand-new directory, so no separate create-by-name dialog exists. A menu only appears where there is something to choose between — with no Workspace listed, the anchor gesture raises the flow directly instead of a one-row popover, and it waits for the list baseline before treating an empty list as final. The runtime Session and Workspace services own materialization. The Workspace row's Delete action opens a confirmation that states the retention boundary, blocks duplicate submission, and keeps failures open; success removes the group while its Sessions remain under Ungrouped. The Session row's Rename action opens the same browser-owned dialog pattern prefilled with the row's display title: no client-side conflict rule exists (the host normalizes and may reject with `title-invalid`, rendered in the dialog alert), and confirming an unchanged title is deliberately allowed — it pins the current automatic title against regeneration. The Session row's Archive action commits without a confirmation dialog (non-destructive: the log and the workspace accounting slot remain) through `ctx.workspaces.archiveSession`; the row disappears from every grouping surface — workspace groups, Ungrouped, content search, and the flat list — when the archive-set echo lands, and failures are console diagnostics that leave the tree unchanged. A blank New Session row is a pure placeholder: it renders no row menu and no time label (nothing has happened in it yet), so rename, fork, and archive first apply once the first prompt lands.
+diff --git a/packages/client/ui-workspace/README.zh.md b/packages/client/ui-workspace/README.zh.md
+index de9419799e..01e303723f 100644
+--- a/packages/client/ui-workspace/README.zh.md
++++ b/packages/client/ui-workspace/README.zh.md
+@@ -6,6 +6,8 @@
+
+ 该浏览器通过全局运行时钩子将 Session 行渲染为分组或扁平形式，并负责 Workspace 添加／重命名／重排序以及 Session 重排序。每个 Workspace 会记住自身是关闭还是显示 Session；打开后默认显示五条 Session，其余条目通过临时的**展开其余**控件显示，而关闭并重新打开整个 Workspace 后会恢复为五条。从 Workspace 行创建 Session 时会先打开该分组，使 Session 状态到达后新行保持可见。Workspace 列表基线就绪后，浏览器持久化的展开状态与 Session 顺序记录只保留当前 Workspace id、Ungrouped 和单列表记账。视图选项把分组方式和每个记账各自的一份浏览器持久化 Session 顺序放在一起：真实 Workspace 从 `WorkspaceView.sessionIds` 初始化，Ungrouped 和跨 Workspace 的单列表则从最近更新时间顺序初始化。**手动排序**和**最近更新**在两种呈现方式下都可用。进入最近更新时会执行一次完整的时间排序，后续 user prompt 或 steer 会将对应 Session 置顶一次；进入手动排序则保留所有当前位置并停用后续置顶。两种模式下的拖拽都会编辑当前顺序；真实 Workspace 在手动模式下的拖拽还会更新 Host Session 记账，而 Ungrouped 和单列表因没有单一 Workspace 记账，其顺序始终只保存在浏览器本地。单列表没有父级层次，因此不显示空的左侧状态槽；Session 存在可见状态时仍保留该槽。无论采用哪种 Session 顺序，Workspace 拖拽顺序都由 Host 持久化。
+
++在 `sidebar.workspaces.presetGroups` 注册的备选分组会从浏览器 owner 接收官方 Session 投影、行渲染席位以及必需的重命名／分叉／归档回调。它可以添加分组身份、元数据和操作，但不会导入或复制 Workspace 行实现；折叠、溢出、活动动画、菜单、间距和整组拖拽预览因此都由本包内的唯一权威负责。
++
+ 折叠搜索是视图和添加操作旁的一枚区头按钮。在轨道中，添加和搜索会渲染为沿外壳共用横向进入路径移动的 36px 控件。激活搜索后，输入框会扩展并占据区头；点击外部只会收起经清除首尾空白后为空的查询——但轨道搜索手势仍在进行期间（直至列滑动结束、焦点落入输入框）除外，这样触发展开的那次点击不会收起它刚打开的搜索——而清除控件总会重置并收起搜索。非空白查询会以单一扁平结果列表替代任一浏览模式：不区分大小写的标题和 Workspace 子串匹配项会立即显示，经 250 ms 防抖的 Host 请求则会加入经过排序的当前对话内容匹配项及其摘要片段。英文搜索输入框及其防御性请求路径会移除 NUL，将查询限制在传输 schema 规定的 500 个 UTF-16 代码单元内且不会拆分代理项对，并保留现有的防抖与取消行为。每次新查询都会中止前一个请求；内容搜索失败时，元数据匹配项仍会显示，同时给出警告。列表最多显示 20 条结果，并会在查询过宽时提示用户缩小范围；打开所选 Session 时既不会清除查询，也不会跳转至特定事件。
+
+ 该选择器通过全局 `useWorkspaces` hook 列出真实的 Host Workspace 实体。选择 Workspace 会调用 slot owner 的 `onPick` 回调，重新定位前端 Session 对象。不同的规范化路径即使 basename 和显示标题相同，仍会作为由 id 区分的独立 Workspace；侧边栏的悬停详情把 POSIX 家目录及其后代显示为 `~`／`~/…`，Windows 路径保持原样。每个注册各自声明一个**目录流子 slot**（`single` kind：`conversation.hero.workspace.directoryFlow`／`sidebar.workspaces.directoryFlow`），由组合的选择器包 client half 填入其选取交互——今天是 [`-native`](../../host/directory-picker-native/README.zh.md) 后端的无渲染 OS 选择器驱动，`-browse` 组合下则是应用内浏览对话框。平铺显示的 **添加工作区…** 操作仅在当前界面的 slot 被占用时渲染（每次菜单渲染读取占用状态；slot 为空意味着该组合没有目录选择能力——seam 文档化的无流程默认行为，此时侧边栏区头直接不渲染添加按钮，而非留下一个点了没反应的按钮）。本包持有触发与接纳：占用方通过 slot 的属主交互约定（`open`/`busy`/`onPicked`/`onCancel`/`onError`）每次打开上报一个所选路径，owner 通过对象层接纳它，并等待 Workspace 列表投影刷新后才选中已提交的 Workspace；取消操作不会显示提示，错误落入可重试的文件夹对话框，其 **重新选择** 会重新打开流程。添加只有一条路径：占用者自带的新建文件夹能力已经覆盖了全新目录，因此不再单设按名称创建的对话框。菜单只在确有多个目标可选时出现——没有 Workspace 可列时，锚点手势直接拉起流程，而不是弹出只有一行的浮层；在列表基线落地前，空列表不算最终结果。运行时 Session 与 Workspace 服务负责物化。Workspace 行内的 Delete 操作会打开确认框，说明保留边界、阻止重复提交，并在失败时保持打开；成功后，该分组会被移除，其 Session 则留在 Ungrouped 下。Session 行内的 Rename 操作打开同款浏览器持有的对话框，并以该行的显示标题预填：客户端不设名称冲突规则（host 负责规范化，可能以 `title-invalid` 拒绝，错误渲染在对话框告警区）；确认未修改的标题是有意允许的——这正是把当前自动标题钉住、不再被重新生成覆盖的手势。Session 行内的 Archive 操作不经确认对话框直接提交（非破坏性：日志和 workspace 记账席位保持不变），通过 `ctx.workspaces.archiveSession` 归档；归档集合回声落地后，该行从所有分组视图——workspace 分组、Ungrouped、内容搜索和平铺列表——中消失，失败只作为控制台诊断输出，树保持不变。空白的「新会话」行只是占位符：不渲染行菜单和时间标签（其中还没有发生任何事），重命名、fork 和归档都从首条提示词落地后才可用。
+diff --git a/packages/client/ui-workspace/src/client/WorkspaceBrowser.module.css b/packages/client/ui-workspace/src/client/WorkspaceBrowser.module.css
+index 4d19163322..e6488191b3 100644
+--- a/packages/client/ui-workspace/src/client/WorkspaceBrowser.module.css
++++ b/packages/client/ui-workspace/src/client/WorkspaceBrowser.module.css
+@@ -352,8 +352,7 @@
+ }
+
+ .flatList > * + *,
+-.searchTree > [role='treeitem'] + [role='treeitem'],
+-.groupSection > * + * {
++.searchTree > [role='treeitem'] + [role='treeitem'] {
+   margin-top: 2px;
+ }
+
+@@ -369,18 +368,7 @@
+   color: var(--dsw-alias-label-secondary);
+ }
+
+-/* One workspace section: header row + a compact expanded session run. */
+-.groupSection {
+-  position: relative;
+-}
+-
+-.groupSection + .groupSection {
+-  margin-top: 4px;
+-}
+-
+-.listTopDropIndicator,
+-.workspaceDropBefore::before,
+-.workspaceDropAfter::after {
++.listTopDropIndicator {
+   content: '';
+   position: absolute;
+   z-index: 1;
+@@ -414,40 +402,6 @@
+   right: var(--dsh-session-list-edge-inset);
+ }
+
+-.listTopDropActive > .workspaceDropBefore:first-child::before {
+-  display: none;
+-}
+-
+-.workspaceDropBefore::before {
+-  top: -8px;
+-}
+-
+-.workspaceDropAfter::after {
+-  bottom: -8px;
+-}
+-
+-.sessionOverflowButton {
+-  width: 100%;
+-  height: 28px;
+-  border: none;
+-  border-radius: 8px;
+-  padding: 0 12px 0 28px;
+-  background: transparent;
+-  cursor: pointer;
+-  text-align: left;
+-  font-size: 12px;
+-  color: var(--dsw-alias-label-tertiary);
+-}
+-
+-.groupSection > .sessionOverflowButton {
+-  margin-top: 0;
+-}
+-
+-.sessionOverflowButton:hover {
+-  background: transparent;
+-  color: var(--dsw-alias-label-secondary);
+-}
+-
+ .empty {
+   padding: 16px 12px;
+   color: var(--dsw-alias-label-tertiary);
+diff --git a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
+index 08f22ed400..171323eda1 100644
+--- a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
++++ b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
+@@ -18,11 +18,13 @@ import {
+ import type {
+   SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+ } from '@deepseek-ai/dsh-client-runtime/client'
+-import type { WorkspaceBrowserProps } from './contract/slots.ts'
++import type { PresetRowsOwner, WorkspaceBrowserProps } from './contract/slots.ts'
+ import type { SessionNode, SessionOrderBy } from './tree.ts'
+-import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
+-import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
+-import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
++import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY, workspaceLabel } from './tree.ts'
++import {
++  ProjectGroupItem, ProjectRowItem, SearchResultItem, SessionNodeItem, SessionOverflowButton,
++} from './rows/Rows.tsx'
++import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from './stores.ts'
+ import { WorkspacePickFlow } from './WorkspacePicker.tsx'
+ import css from './WorkspaceBrowser.module.css'
+
+@@ -145,9 +147,9 @@ function nextSessionOrderAccount({
+
+ /** Grouping and ordering menu; own open state so it resets with the wide chrome. */
+ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
+-  groupBy: 'workspace' | 'flat'
++  groupBy: SessionGroupBy
+   orderBy: SessionOrderBy
+-  onGroupPick: (mode: 'workspace' | 'flat') => void
++  onGroupPick: (mode: SessionGroupBy) => void
+   onOrderPick: (mode: SessionOrderBy) => void
+   t: WorkspaceBrowserProps['t']
+ }) {
+@@ -160,6 +162,7 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
+         { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
+         { id: 'workspace', label: t('groupBy.workspace') },
+         { id: 'flat', label: t('groupBy.flat') },
++        { id: 'preset', label: t('groupBy.preset') },
+         { type: 'separator' as const, id: 'order-by-separator' },
+         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
+         { id: 'manual', label: t('orderBy.manual') },
+@@ -167,7 +170,7 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
+       ]}
+       selectedIds={[groupBy, orderBy]}
+       onSelect={(id) => {
+-        if (id === 'workspace' || id === 'flat') onGroupPick(id)
++        if (id === 'workspace' || id === 'flat' || id === 'preset') onGroupPick(id)
+         else if (id === 'manual' || id === 'updated') onOrderPick(id)
+         setOpen(false)
+       }}
+@@ -207,12 +210,6 @@ interface WorkspaceDragState {
+   over: { id: WorkspaceId; half: 'before' | 'after' } | null
+ }
+
+-/** Resolve an insertion side from the full rendered workspace group. */
+-function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' | 'after' {
+-  const rect = e.currentTarget.getBoundingClientRect()
+-  return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+-}
+-
+ type SessionTreeProps = Pick<
+   WorkspaceBrowserProps,
+   'useSessions' | 'startSession' | 'open' | 'forkSession'
+@@ -386,7 +383,7 @@ function SessionTree({
+     <div className={clsx(css.treeBody, css.wide)}>
+       {workspaceDropAtListStart && <span className={css.listTopDropIndicator} aria-hidden="true" />}
+       <div
+-        className={clsx(css.list, workspaceDropAtListStart && css.listTopDropActive)}
++        className={css.list}
+         role="tree"
+         aria-label={t('section.sessions')}
+       >
+@@ -429,25 +426,16 @@ function SessionTree({
+           // Group section: header row + expanded top-level session rows. The
+           // inter-group breathing room is the section's own margin
+           // (WorkspaceBrowser.module.css).
+-            <div
++            <ProjectGroupItem
+               key={group.key}
+-              className={clsx(
+-                css.groupSection,
+-                workspaceMarker === 'before' && css.workspaceDropBefore,
+-                workspaceMarker === 'after' && css.workspaceDropAfter,
+-              )}
+-              onDragOver={workspaceDrag === null || hoverWorkspace === undefined
+-                ? undefined
+-                : (e) => {
+-                  e.preventDefault()
+-                  e.dataTransfer.dropEffect = 'move'
+-                  hoverWorkspace(workspaceGroupHalf(e))
+-                }}
+-              onDrop={workspaceDrag === null || dropWorkspace === undefined
++              hideMarker={workspaceDropAtListStart && group === groups[0]}
++              drag={hoverWorkspace === undefined || dropWorkspace === undefined
+                 ? undefined
+-                : (e) => {
+-                  e.preventDefault()
+-                  dropWorkspace(workspaceGroupHalf(e))
++                : {
++                  active: workspaceDrag !== null,
++                  marker: workspaceMarker,
++                  hover: hoverWorkspace,
++                  drop: dropWorkspace,
+                 }}
+             >
+               <ProjectRowItem
+@@ -525,18 +513,14 @@ function SessionTree({
+                 )
+               })}
+               {group.sessions.length > COLLAPSED_SESSION_LIMIT && (
+-                <button
+-                  type="button"
+-                  className={css.sessionOverflowButton}
+-                  aria-expanded={expandedSessionGroups.includes(group.key)}
+-                  onClick={() => { setExpandedSessionGroups(keys => toggled(keys, group.key)) }}
+-                >
+-                  {expandedSessionGroups.includes(group.key)
+-                    ? t('sessions.collapse')
+-                    : t('sessions.expand', { n: group.sessions.length - COLLAPSED_SESSION_LIMIT })}
+-                </button>
++                <SessionOverflowButton
++                  expanded={expandedSessionGroups.includes(group.key)}
++                  remaining={group.sessions.length - COLLAPSED_SESSION_LIMIT}
++                  onToggle={() => { setExpandedSessionGroups(keys => toggled(keys, group.key)) }}
++                  t={t}
++                />
+               )}
+-            </div>
++            </ProjectGroupItem>
+           )
+         })}
+       </div>
+@@ -781,6 +765,14 @@ export function WorkspaceBrowser({
+     const current = state.current
+     return current !== undefined && state.byId[current]?.blank === true ? current : undefined
+   })
++  const presetRows = useMemo<PresetRowsOwner>(() => ({
++    deriveSessions: deriveFlat,
++    workspaceLabel,
++    renderProjectGroup: props => <ProjectGroupItem {...props} />,
++    renderProjectRow: props => <ProjectRowItem {...props} t={t} />,
++    renderSessionRow: props => <SessionNodeItem {...props} t={t} />,
++    renderSessionOverflow: props => <SessionOverflowButton {...props} t={t} />,
++  }), [t])
+   const currentBlankAccount = currentBlankSessionId === undefined
+     ? undefined
+     : (workspaces.find(workspace => workspace.sessionIds.includes(currentBlankSessionId))
+@@ -1012,7 +1004,11 @@ export function WorkspaceBrowser({
+       <div className={css.sectionHeader}>
+         {wide && (
+           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
+-            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
++            {groupBy === 'flat'
++              ? t('section.sessions')
++              : groupBy === 'preset'
++                ? t('section.presets')
++                : t('section.workspaces')}
+           </span>
+         )}
+         {wide && (
+@@ -1141,7 +1137,18 @@ export function WorkspaceBrowser({
+       {/* Always-mounted seat keeps the region's flex slot while the list
+           itself is wide-only. */}
+       <div className={css.listArea}>
+-        {wide && (normalizedQuery !== ''
++        {wide && (groupBy === 'preset'
++          ? renderSlot('sidebar.workspaces.presetGroups', {
++            wide,
++            query: normalizedQuery,
++            rows: presetRows,
++            sessionActions: {
++              onRename: onSessionRename,
++              onFork: forkSession,
++              onArchive: onSessionArchive,
++            },
++          })
++          : normalizedQuery !== ''
+           ? (
+             <SearchResults
+               useSessions={useSessions}
+diff --git a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages/client/ui-workspace/src/client/contract/slots.ts
+index bdd85052a0..b88ae51ff6 100644
+--- a/packages/client/ui-workspace/src/client/contract/slots.ts
++++ b/packages/client/ui-workspace/src/client/contract/slots.ts
+@@ -22,6 +22,7 @@
+  * and a hole has exactly one declaring entry — they carry the same owner
+  * contract and the same occupant.
+  */
++import type { ReactNode } from 'react'
+ import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
+ import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+ // Type-only: pull the owner SlotMap merges into programs that resolve the
+@@ -29,9 +30,13 @@ import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRu
+ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+ import type {
+-  SessionId, SessionSearchResultItem, WorkspaceId, WorkspaceView,
++  SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+ } from '@deepseek-ai/dsh-client-runtime/client'
+ import type { createWorkspaceViewStore } from '../stores.ts'
++import type { SessionNode } from '../tree.ts'
++import type {
++  ProjectGroupItemProps, ProjectRowItemProps, SessionNodeItemProps, SessionOverflowButtonProps,
++} from '../rows/Rows.tsx'
+
+ /**
+  * Owner share of the directory-flow holes: the complete conversation between
+@@ -57,6 +62,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
      /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
      'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
@@ -9,27 +315,54 @@ diff -ruN a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages
 +    'sidebar.workspaces.presetGroups': { kind: 'single'; scope: 'root'; owner: PresetGroupsOwnerProps }
    }
  }
- 
-@@ -83,6 +85,18 @@
+
+@@ -82,6 +89,45 @@ export type DirectoryPickingInjected = {
+ /** Component-side view of the picking share: the bound occupancy selector hook. */
  export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']>
- 
- /**
-+ * Owner share of the preset-group tree: the sidebar's width state plus the
-+ * browser's live search query. The tree renders only in the wide state and
-+ * filters preset group titles against `query`.
+
++/**
++ * Official row authority exposed to an alternate grouping tree. Renderers
++ * close over the workspace locale and keep every row behavior/style inside
++ * ui-workspace; an occupant supplies only grouping facts and decorations.
++ * The session projection likewise keeps visibility and activity semantics in
++ * the official workspace implementation.
++ */
++export interface PresetRowsOwner {
++  deriveSessions: (list: SessionListState, archivedSessionIds: readonly SessionId[]) => readonly SessionNode[]
++  workspaceLabel: (cwd: string | undefined) => string
++  renderProjectGroup: (props: ProjectGroupItemProps) => ReactNode
++  renderProjectRow: (props: Omit<ProjectRowItemProps, 't'>) => ReactNode
++  renderSessionRow: (props: Omit<SessionNodeItemProps, 't'>) => ReactNode
++  renderSessionOverflow: (props: Omit<SessionOverflowButtonProps, 't'>) => ReactNode
++}
++
++/** Browser-owned session actions that an alternate grouping must preserve. */
++export interface PresetSessionActions {
++  onRename: NonNullable<SessionNodeItemProps['onRename']>
++  onFork: NonNullable<SessionNodeItemProps['onFork']>
++  onArchive: NonNullable<SessionNodeItemProps['onArchive']>
++}
++
++/**
++ * Owner share of the preset-group tree: browser state plus the official row
++ * authority needed to render an alternate grouping dimension without
++ * importing another plugin's runtime module.
 + */
 +export interface PresetGroupsOwnerProps {
 +  /** True while the shell is in its wide state. */
 +  wide: boolean
 +  /** The browser's normalized search query ('' while the search is idle). */
 +  query: string
++  /** Official projection and render seats; occupants must not clone workspace rows. */
++  rows: PresetRowsOwner
++  /** Required official row actions; omitting them would remove the row overflow surface. */
++  sessionActions: PresetSessionActions
 +}
 +
-+/**
+ /**
   * Browser-private injected share (arrives via the register inject factory).
   * Data reads use the global framework hooks; these are the Host actions the
-  * browsing region drives.
-@@ -142,7 +156,7 @@
+@@ -142,7 +188,7 @@ export type WorkspaceBrowserInjected = {
  /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */
  export type WorkspaceBrowserProps =
    PropsRuntime<'sidebar.workspaces'>
@@ -38,10 +371,24 @@ diff -ruN a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages
    & PropsStore<ReturnType<typeof createWorkspaceViewStore>>
    & Omit<WorkspaceBrowserInjected, 'hooks'>
    & PropsHooks<WorkspaceBrowserInjected['hooks']>
-diff -ruN a/packages/client/ui-workspace/src/client/index.ts b/packages/client/ui-workspace/src/client/index.ts
---- a/packages/client/ui-workspace/src/client/index.ts	2026-08-24 14:19:53.144981944 +0800
-+++ b/packages/client/ui-workspace/src/client/index.ts	2026-08-24 14:19:53.174982427 +0800
-@@ -113,7 +113,10 @@
+diff --git a/packages/client/ui-workspace/src/client/index.ts b/packages/client/ui-workspace/src/client/index.ts
+index 93269c22c1..30bf5c52a9 100644
+--- a/packages/client/ui-workspace/src/client/index.ts
++++ b/packages/client/ui-workspace/src/client/index.ts
+@@ -21,9 +21,11 @@ import { en, zh, type WorkspaceKey } from './locales.ts'
+
+ export type {
+   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
+-  WorkspaceBrowserInjected, WorkspaceBrowserProps, WorkspacePickerInjected, WorkspacePickerProps,
++  PresetRowsOwner, PresetSessionActions, WorkspaceBrowserInjected, WorkspaceBrowserProps,
++  WorkspacePickerInjected, WorkspacePickerProps,
+ } from './contract/slots.ts'
+ export type { WorkspaceKey } from './locales.ts'
++export type { GroupNode, SessionNode } from './tree.ts'
+
+ declare module '@deepseek-ai/dsh-client-ui-slots' {
+   interface LocaleNamespaceMap {
+@@ -113,7 +115,10 @@ export function apply(ctx: ClientContext): void {
    ctx.slots.inject('sidebar.workspaces', () => ctx.slots.register(
      {
        name: 'sidebar.workspaces',
@@ -53,10 +400,11 @@ diff -ruN a/packages/client/ui-workspace/src/client/index.ts b/packages/client/u
        store: createWorkspaceViewStore(),
        inject: browserInjected,
        locale: NS,
-diff -ruN a/packages/client/ui-workspace/src/client/locales.ts b/packages/client/ui-workspace/src/client/locales.ts
---- a/packages/client/ui-workspace/src/client/locales.ts	2026-08-24 14:19:53.139981863 +0800
-+++ b/packages/client/ui-workspace/src/client/locales.ts	2026-08-24 14:19:53.173982411 +0800
-@@ -9,11 +9,13 @@
+diff --git a/packages/client/ui-workspace/src/client/locales.ts b/packages/client/ui-workspace/src/client/locales.ts
+index c08fd931de..00246b066f 100644
+--- a/packages/client/ui-workspace/src/client/locales.ts
++++ b/packages/client/ui-workspace/src/client/locales.ts
+@@ -9,11 +9,13 @@ export const zh = {
    'group.ungrouped': '未分组',
    'session.new': '新会话',
    'section.workspaces': '工作区',
@@ -70,7 +418,7 @@ diff -ruN a/packages/client/ui-workspace/src/client/locales.ts b/packages/client
    'orderBy.label': '排序方式',
    'orderBy.manual': '手动排序',
    'orderBy.updated': '最近更新',
-@@ -78,11 +80,13 @@
+@@ -78,11 +80,13 @@ export const en = {
    'group.ungrouped': 'Ungrouped',
    'session.new': 'New Session',
    'section.workspaces': 'Workspaces',
@@ -84,82 +432,624 @@ diff -ruN a/packages/client/ui-workspace/src/client/locales.ts b/packages/client
    'orderBy.label': 'Order by',
    'orderBy.manual': 'Manual',
    'orderBy.updated': 'Last updated',
-diff -ruN a/packages/client/ui-workspace/src/client/stores.ts b/packages/client/ui-workspace/src/client/stores.ts
---- a/packages/client/ui-workspace/src/client/stores.ts	2026-08-24 14:19:53.136981815 +0800
-+++ b/packages/client/ui-workspace/src/client/stores.ts	2026-08-24 14:19:53.171982379 +0800
-@@ -10,8 +10,8 @@
+diff --git a/packages/client/ui-workspace/src/client/rows/Rows.module.css b/packages/client/ui-workspace/src/client/rows/Rows.module.css
+index 5dc899af45..7dd65d47de 100644
+--- a/packages/client/ui-workspace/src/client/rows/Rows.module.css
++++ b/packages/client/ui-workspace/src/client/rows/Rows.module.css
+@@ -15,11 +15,62 @@
+   color: var(--dsw-alias-label-primary);
+ }
+
++.projectGroup {
++  position: relative;
++}
++
++.projectGroup > * + * {
++  margin-top: 2px;
++}
++
++.projectGroup + .projectGroup {
++  margin-top: 4px;
++}
++
++.projectGroup.projectDropBefore::before,
++.projectGroup.projectDropAfter::after {
++  content: '';
++  position: absolute;
++  z-index: 1;
++  left: 0;
++  right: 0;
++  height: 12px;
++  background:
++    linear-gradient(
++      55deg,
++      transparent calc(50% - 1px),
++      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),
++      transparent calc(50% + 1px)
++    ) 0 0 / 5px 7px no-repeat,
++    linear-gradient(
++      125deg,
++      transparent calc(50% - 1px),
++      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),
++      transparent calc(50% + 1px)
++    ) 0 5px / 5px 7px no-repeat,
++    linear-gradient(
++      var(--dsw-alias-state-business-primary) 0 0
++    ) 4px 5px / calc(100% - 4px) 2px no-repeat;
++  pointer-events: none;
++}
++
++.projectGroup.projectDropBefore::before {
++  top: -8px;
++}
++
++.projectGroup.projectDropAfter::after {
++  bottom: -8px;
++}
++
+ .projectRow:hover,
+ .sessionRow:hover {
+   background: var(--dsw-alias-interactive-bg-hover);
+ }
+
++.projectRow.muted {
++  opacity: 0.55;
++}
++
+ .sessionRow.selected {
+   background: var(--dsw-alias-interactive-bg-hover);
+ }
+@@ -205,6 +256,12 @@
+   color: var(--dsw-alias-label-tertiary);
+ }
+
++.sessionRow .meta {
++  flex: none;
++  max-width: 40%;
++  margin-right: 6px;
++}
++
+ .time {
+   flex: none;
+   font-size: 12px;
+@@ -341,6 +398,27 @@
+   color: var(--dsw-alias-label-primary);
+ }
+
++.sessionOverflowButton {
++  width: 100%;
++  height: 28px;
++  border: none;
++  border-radius: 8px;
++  padding: 0 12px 0 28px;
++  background: transparent;
++  cursor: pointer;
++  text-align: left;
++  font-size: 12px;
++  color: var(--dsw-alias-label-tertiary);
++}
++
++.projectGroup > .sessionOverflowButton {
++  margin-top: 0;
++}
++
++.sessionOverflowButton:hover {
++  color: var(--dsw-alias-label-secondary);
++}
++
+ /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step
+    darker (tertiary, #81858C) per the cell spec. */
+ .chevron {
+diff --git a/packages/client/ui-workspace/src/client/rows/Rows.tsx b/packages/client/ui-workspace/src/client/rows/Rows.tsx
+index d2d121fe4d..7f046e7b0e 100644
+--- a/packages/client/ui-workspace/src/client/rows/Rows.tsx
++++ b/packages/client/ui-workspace/src/client/rows/Rows.tsx
+@@ -6,7 +6,9 @@
+  * and workspace hover cards are suppressed while a menu is open.
+  */
+ import { useState } from 'react'
++import type { ReactNode } from 'react'
+ import clsx from 'clsx'
++import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+ import {
+   HoverCard, IconArchiveOutline20, IconBranchOutline16, IconEditOutline16,
+   IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16, IconPlusOutline16,
+@@ -14,13 +16,12 @@ import {
+ } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
+ import { abbreviateHomePath } from '@deepseek-ai/dsh-client-runtime/client'
+-import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+ import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
+ import { relativeTime } from '../tree.ts'
+ import css from './Rows.module.css'
+
+ /** The standard locale seat, prop-passed from the browser root. */
+-type RowTranslate = WorkspaceBrowserProps['t']
++type RowTranslate = PropsLocale<'workspace'>['t']
+
+ /** Row display title: blank rows show the localized New Session label. */
+ function displayTitle(node: SessionNode, t: RowTranslate): string {
+@@ -85,17 +86,96 @@ export interface RowDragProps {
+ }
+
+ /** Drag lifecycle owned by a workspace row; its enclosing group owns hit testing. */
+-interface WorkspaceRowDragProps {
++export interface ProjectRowDragProps {
+   start: () => void
+   end: () => void
+ }
+
++/** Whole-project insertion wiring; hit testing spans the header and its visible sessions. */
++export interface ProjectGroupDragProps {
++  /** A compatible project drag is in flight. */
++  active: boolean
++  /** Current insertion marker for this complete project section. */
++  marker: 'before' | 'after' | null
++  /** Report the hovered half of the complete project section. */
++  hover: (half: 'before' | 'after') => void
++  /** Commit a drop on the hovered half. */
++  drop: (half: 'before' | 'after') => void
++}
++
+ /** Pointer-position half of a row (insert line above or below). */
+ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' | 'after' {
+   const rect = e.currentTarget.getBoundingClientRect()
+   return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+ }
+
++/**
++ * Project section wrapper shared by every grouped browser: it owns the
++ * inter-row spacing and full-section insertion preview, so a drag over child
++ * sessions resolves against the same boundary as a drag over the header.
++ * @param props.children - project header, visible sessions, and overflow row.
++ * @param props.drag - optional whole-project drop wiring.
++ * @param props.hideMarker - suppress a marker projected outside a clipping parent.
++ * @returns the project section element.
++ */
++export interface ProjectGroupItemProps {
++  children: ReactNode
++  drag?: ProjectGroupDragProps | undefined
++  hideMarker?: boolean | undefined
++}
++
++export function ProjectGroupItem({ children, drag, hideMarker = false }: ProjectGroupItemProps) {
++  return (
++    <div
++      className={clsx(
++        css.projectGroup,
++        !hideMarker && drag?.marker === 'before' && css.projectDropBefore,
++        !hideMarker && drag?.marker === 'after' && css.projectDropAfter,
++      )}
++      onDragOver={drag?.active !== true
++        ? undefined
++        : (event) => {
++          event.preventDefault()
++          event.dataTransfer.dropEffect = 'move'
++          drag.hover(rowHalf(event))
++        }}
++      onDrop={drag?.active !== true
++        ? undefined
++        : (event) => {
++          event.preventDefault()
++          drag.drop(rowHalf(event))
++        }}
++    >
++      {children}
++    </div>
++  )
++}
++
++/** Props for the shared project header row. */
++export interface ProjectRowItemProps {
++  group: GroupNode
++  onToggle: () => void
++  /** Standard create action; omit when rowActions supplies the full action surface. */
++  onCreate?: (() => void) | undefined
++  /** Real-Workspace actions; absent for non-Workspace grouping dimensions. */
++  actions?: { rename: () => void; delete: () => void } | undefined
++  /** Present on draggable project rows. */
++  drag?: ProjectRowDragProps | undefined
++  /** Host account home; POSIX home-rooted hover paths display as `~`. */
++  home?: string | undefined
++  /** Override the ungrouped fallback label for another grouping dimension. */
++  label?: string | undefined
++  /** Identity mark occupying the standard folder slot (for example a preset star). */
++  leading?: ReactNode
++  /** Compact facts between the title and action surface. */
++  meta?: ReactNode
++  /** Complete custom action surface for another grouping dimension. */
++  rowActions?: ReactNode
++  /** De-emphasize a retained but inactive group. */
++  muted?: boolean | undefined
++  t: RowTranslate
++}
++
+ /**
+  * Project (workspace) header row: folder + title;
+  * hover reveals the chevron and create button, and dwelling on a real
+@@ -109,21 +189,13 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
+  * @param props.t - the browser root's locale seat.
+  * @returns the row element.
+  */
+-export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home, t }: {
+-  group: GroupNode
+-  onToggle: () => void
+-  onCreate: () => void
+-  /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
+-  actions?: { rename: () => void; delete: () => void } | undefined
+-  /** Present only for real Workspace rows in the grouped view. */
+-  drag?: WorkspaceRowDragProps | undefined
+-  /** Host account home; POSIX home-rooted hover paths display as `~`. */
+-  home?: string | undefined
+-  t: RowTranslate
+-}) {
++export function ProjectRowItem({
++  group, onToggle, onCreate, actions, drag, home, label: labelOverride,
++  leading, meta, rowActions, muted = false, t,
++}: ProjectRowItemProps) {
+   const row = group
+   // The ungrouped bucket has no workspace title: its label is dictionary copy.
+-  const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
++  const label = labelOverride ?? (row.workspaceId === undefined ? t('group.ungrouped') : row.label)
+   const active = group.expanded && group.containsCurrent
+   const [menuOpen, setMenuOpen] = useState(false)
+   const workspaceMenuItems = [
+@@ -132,7 +204,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
+   ]
+   const ownRow = (
+     <div
+-      className={clsx(css.projectRow, menuOpen && css.menuOpen)}
++      className={clsx(css.projectRow, menuOpen && css.menuOpen, muted && css.muted)}
+       role="treeitem"
+       aria-expanded={row.expanded}
+       onClick={onToggle}
+@@ -147,7 +219,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
+       onDragEnd={drag?.end}
+     >
+       <span className={clsx(css.slot, css.folder, active && css.folderActive)}>
+-        {row.expanded ? <IconFolderOpen16 /> : <IconFolderClose16 />}
++        {leading ?? (row.expanded ? <IconFolderOpen16 /> : <IconFolderClose16 />)}
+       </span>
+       <span className={clsx(css.slot, css.chevron)}>
+         <IconTriangleRightFill14 className={clsx(css.arrow, row.expanded && css.arrowOpen)} />
+@@ -155,8 +227,11 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
+       <span className={css.projectText}>
+         <span className={css.title}>{label}</span>
+       </span>
+-      <span className={css.rowActions}>
+-        {actions !== undefined && (
++      {meta !== undefined && <span className={css.meta}>{meta}</span>}
++      {(rowActions !== undefined || actions !== undefined || onCreate !== undefined) && (
++        <span className={css.rowActions}>
++          {rowActions ?? <>
++          {actions !== undefined && (
+           <Menu
+             open={menuOpen}
+             onClose={() => { setMenuOpen(false) }}
+@@ -184,15 +259,17 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
+             )}
+           />
+         )}
+-        <button
++          {onCreate !== undefined && <button
+           type="button"
+           className={css.iconButton}
+           aria-label={t('actions.newSession.aria', { name: label })}
+           onClick={(e) => { e.stopPropagation(); onCreate() }}
+         >
+           <IconPlusOutline16 />
+-        </button>
+-      </span>
++          </button>}
++          </>}
++        </span>
++      )}
+     </div>
+   )
+   // The ungrouped bucket has no backing Workspace: no card to show.
+@@ -359,23 +436,27 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
+  * @param props.t - the browser root's locale seat.
+  * @returns the session row.
+  */
+-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
++export interface SessionNodeItemProps {
+   node: SessionNode
+   currentId: string | undefined
+   now: number
+   onOpen: (id: SessionNode['id']) => void
+   /** Open the browser-owned session rename dialog (row menu action). */
+-  onRename: (id: SessionNode['id'], currentTitle: string) => void
++  onRename?: ((id: SessionNode['id'], currentTitle: string) => void) | undefined
+   /** Fork a session at its last completed turn (row menu action). */
+-  onFork: (id: SessionNode['id']) => void
++  onFork?: ((id: SessionNode['id']) => void) | undefined
+   /** Archive this session (row menu action; commits without a dialog). */
+-  onArchive: (id: SessionNode['id']) => void
++  onArchive?: ((id: SessionNode['id']) => void) | undefined
++  /** Grouping-dimension context rendered in the standard trailing metadata seat. */
++  meta?: ReactNode
+   /** Present only on draggable rows (workspace-group sessions outside search). */
+   drag?: RowDragProps | undefined
+   /** The row is rendered without a parent Workspace header. */
+   flat?: boolean | undefined
+   t: RowTranslate
+-}) {
++}
++
++export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, meta, drag, flat = false, t }: SessionNodeItemProps) {
+   const row = node
+   const title = displayTitle(node, t)
+   const selected = node.id === currentId
+@@ -387,10 +468,10 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
+   // touches the session log, so it is not styled as destructive and needs no
+   // confirmation dialog.
+   const sessionMenuItems = [
+-    { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
+-    { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
++    ...(onRename === undefined ? [] : [{ id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> }]),
++    ...(onFork === undefined ? [] : [{ id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> }]),
+     // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
+-    { id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> },
++    ...(onArchive === undefined ? [] : [{ id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> }]),
+   ]
+   // Figma session cell: pad 8, status slot 16, then a 4px title gap.
+   const ownRow = (
+@@ -437,12 +518,13 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
+         </span>
+       )}
+       <span className={css.title}>{title}</span>
++      {meta !== undefined && <span className={css.meta}>{meta}</span>}
+       {/* A blank New Session row is a provisional placeholder: nothing has
+           happened in it yet, so a "now" timestamp and the row verbs
+           (rename/fork/archive) would all act on content that does not
+           exist — both trailing cells stay off until the first prompt. */}
+       {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
+-      {!row.blank && (
++      {!row.blank && sessionMenuItems.length > 0 && (
+         <span className={css.rowActions}>
+           <Menu
+             open={menuOpen}
+@@ -450,9 +532,9 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
+             items={sessionMenuItems}
+             onSelect={(id) => {
+               setMenuOpen(false)
+-              if (id === 'rename') onRename(node.id, row.title)
+-              if (id === 'fork') onFork(node.id)
+-              if (id === 'archive') onArchive(node.id)
++              if (id === 'rename') onRename?.(node.id, row.title)
++              if (id === 'fork') onFork?.(node.id)
++              if (id === 'archive') onArchive?.(node.id)
+             }}
+             portal
+             closeOnPointerLeave
+@@ -482,3 +564,31 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
+     />
+   )
+ }
++
++/**
++ * Standard overflow row below an expanded project group.
++ * @param props.expanded - whether all sessions are visible.
++ * @param props.remaining - hidden session count while collapsed.
++ * @param props.onToggle - switch between the preview and full list.
++ * @param props.t - workspace-browser translation seat.
++ * @returns the overflow button.
++ */
++export interface SessionOverflowButtonProps {
++  expanded: boolean
++  remaining: number
++  onToggle: () => void
++  t: RowTranslate
++}
++
++export function SessionOverflowButton({ expanded, remaining, onToggle, t }: SessionOverflowButtonProps) {
++  return (
++    <button
++      type="button"
++      className={css.sessionOverflowButton}
++      aria-expanded={expanded}
++      onClick={onToggle}
++    >
++      {expanded ? t('sessions.collapse') : t('sessions.expand', { n: remaining })}
++    </button>
++  )
++}
+diff --git a/packages/client/ui-workspace/src/client/stores.ts b/packages/client/ui-workspace/src/client/stores.ts
+index f085329643..8c043fb165 100644
+--- a/packages/client/ui-workspace/src/client/stores.ts
++++ b/packages/client/ui-workspace/src/client/stores.ts
+@@ -10,8 +10,8 @@ import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-run
  /** Browser-local order account for the hierarchy-free flat Session list. */
  export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
- 
+
 -/** Session-list grouping mode: workspace sections or one flat recency list. */
 -export type SessionGroupBy = 'workspace' | 'flat'
 +/** Session-list grouping mode: workspace sections, one flat recency list, or preset groups. */
 +export type SessionGroupBy = 'workspace' | 'flat' | 'preset'
  /** Session order: user-arranged only, or user-arranged plus activity promotion. */
  export type SessionOrderBy = 'manual' | 'updated'
- 
-diff -ruN a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
---- a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx	2026-08-24 14:19:53.147981992 +0800
-+++ b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx	2026-08-24 14:19:53.179982508 +0800
-@@ -22,7 +22,7 @@
- import type { SessionNode, SessionOrderBy } from './tree.ts'
- import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
- import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
--import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
-+import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from './stores.ts'
- import { WorkspacePickFlow } from './WorkspacePicker.tsx'
- import css from './WorkspaceBrowser.module.css'
- 
-@@ -145,9 +145,9 @@
- 
- /** Grouping and ordering menu; own open state so it resets with the wide chrome. */
- function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
--  groupBy: 'workspace' | 'flat'
-+  groupBy: SessionGroupBy
-   orderBy: SessionOrderBy
--  onGroupPick: (mode: 'workspace' | 'flat') => void
-+  onGroupPick: (mode: SessionGroupBy) => void
-   onOrderPick: (mode: SessionOrderBy) => void
-   t: WorkspaceBrowserProps['t']
- }) {
-@@ -160,6 +160,7 @@
-         { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
-         { id: 'workspace', label: t('groupBy.workspace') },
-         { id: 'flat', label: t('groupBy.flat') },
-+        { id: 'preset', label: t('groupBy.preset') },
-         { type: 'separator' as const, id: 'order-by-separator' },
-         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
-         { id: 'manual', label: t('orderBy.manual') },
-@@ -167,7 +168,7 @@
-       ]}
-       selectedIds={[groupBy, orderBy]}
-       onSelect={(id) => {
--        if (id === 'workspace' || id === 'flat') onGroupPick(id)
-+        if (id === 'workspace' || id === 'flat' || id === 'preset') onGroupPick(id)
-         else if (id === 'manual' || id === 'updated') onOrderPick(id)
-         setOpen(false)
-       }}
-@@ -1012,7 +1013,11 @@
-       <div className={css.sectionHeader}>
-         {wide && (
-           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
--            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
-+            {groupBy === 'flat'
-+              ? t('section.sessions')
-+              : groupBy === 'preset'
-+                ? t('section.presets')
-+                : t('section.workspaces')}
-           </span>
-         )}
-         {wide && (
-@@ -1141,7 +1146,9 @@
-       {/* Always-mounted seat keeps the region's flex slot while the list
-           itself is wide-only. */}
-       <div className={css.listArea}>
--        {wide && (normalizedQuery !== ''
-+        {wide && (groupBy === 'preset'
-+          ? renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery })
-+          : normalizedQuery !== ''
-           ? (
-             <SearchResults
-               useSessions={useSessions}
+
+diff --git a/packages/client/ui-workspace/tests/browser-styles.client.spec.ts b/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
+index 5554c977bb..60f0be2381 100644
+--- a/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
++++ b/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
+@@ -72,13 +72,13 @@ describe('WorkspaceBrowser.module.css list', () => {
+   it('keeps 2px between rows and 4px between workspace groups', () => {
+     expect(declarations('.flatList > * + *')?.get('margin-top')).toBe('2px')
+     expect(declarations(".searchTree > [role='treeitem'] + [role='treeitem']")?.get('margin-top')).toBe('2px')
+-    expect(declarations('.groupSection > * + *')?.get('margin-top')).toBe('2px')
+-    expect(declarations('.groupSection + .groupSection')?.get('margin-top')).toBe('4px')
++    expect(rowDeclarations('.projectGroup > * + *')?.get('margin-top')).toBe('2px')
++    expect(rowDeclarations('.projectGroup + .projectGroup')?.get('margin-top')).toBe('4px')
+   })
+
+   it('draws drag targets as a leading chevron joined to the insertion line', () => {
+     const listTopMarker = declarations('.listTopDropIndicator')
+-    const workspaceMarker = declarations('.workspaceDropBefore::before')
++    const workspaceMarker = rowDeclarations('.projectGroup.projectDropBefore::before')
+     const sessionMarker = rowDeclarations('.sessionRow.dropBefore::before')
+     expect(listTopMarker?.get('top')).toBe('-8px')
+     expect(listTopMarker?.get('left')).toBe('0')
+@@ -98,7 +98,7 @@ describe('WorkspaceBrowser.module.css list', () => {
+
+   it('keeps the compact fade, overflow control, search field, and row heights', () => {
+     expect(declarations('.fade')?.get('height')).toBe('24px')
+-    expect(declarations('.sessionOverflowButton')?.get('height')).toBe('28px')
++    expect(rowDeclarations('.sessionOverflowButton')?.get('height')).toBe('28px')
+     expect(declarations('.searchExpanded')?.get('height')).toBe('30px')
+     expect(rowDeclarations('.projectRow')?.get('height')).toBe('34px')
+     expect(rowDeclarations('.sessionRow')?.get('height')).toBe('32px')
+diff --git a/packages/client/ui-workspace/tests/rows.client.spec.tsx b/packages/client/ui-workspace/tests/rows.client.spec.tsx
+index f86e275c5e..a9bd5674a5 100644
+--- a/packages/client/ui-workspace/tests/rows.client.spec.tsx
++++ b/packages/client/ui-workspace/tests/rows.client.spec.tsx
+@@ -4,8 +4,10 @@ import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-l
+ import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+-import type { RowDragProps } from '../src/client/rows/Rows.tsx'
+-import { ProjectRowItem, SearchResultItem, SessionNodeItem } from '../src/client/rows/Rows.tsx'
++import type { ProjectGroupDragProps, RowDragProps } from '../src/client/rows/Rows.tsx'
++import {
++  ProjectGroupItem, ProjectRowItem, SearchResultItem, SessionNodeItem, SessionOverflowButton,
++} from '../src/client/rows/Rows.tsx'
+ import type { GroupNode, SearchResultNode, SessionNode } from '../src/client/tree.ts'
+ import { zh } from '../src/client/locales.ts'
+
+@@ -128,6 +130,31 @@ describe('workspace browser rows', () => {
+     expect(onToggle).toHaveBeenCalledOnce()
+   })
+
++  it('renders another grouping dimension through the shared project row seats', () => {
++    const onToggle = vi.fn()
++    const onStar = vi.fn()
++    const group: GroupNode = {
++      key: 'preset', workspaceId: undefined, cwd: undefined, createdAt: undefined, label: 'ignored',
++      sessionCount: 2, expanded: false, containsCurrent: false, sessions: [],
++    }
++    render(<ProjectRowItem
++      group={group}
++      label="Preset Alpha"
++      leading={<button type="button" onClick={(event) => { event.stopPropagation(); onStar() }}>★</button>}
++      meta="2 sessions"
++      rowActions={<button type="button" onClick={event => { event.stopPropagation() }}>manage</button>}
++      onToggle={onToggle}
++      t={t}
++    />)
++
++    fireEvent.click(screen.getByRole('button', { name: '★' }))
++    expect(onStar).toHaveBeenCalledOnce()
++    expect(onToggle).not.toHaveBeenCalled()
++    expect(screen.getByText('Preset Alpha')).toBeTruthy()
++    expect(screen.getByText('2 sessions')).toBeTruthy()
++    expect(screen.queryByRole('button', { name: /新建会话/ })).toBeNull()
++  })
++
+   it('renders and opens a selected running Session row', () => {
+     const node: SessionNode = {
+       id: sid('session'), title: 'Session', blank: false, running: true,
+@@ -147,6 +174,52 @@ describe('workspace browser rows', () => {
+     expect(onOpen).toHaveBeenCalledWith(node.id)
+   })
+
++  it('renders grouping metadata in its own spaced seat and permits a read-only action surface', () => {
++    const node: SessionNode = {
++      id: sid('session-meta'), title: 'Session', blank: false, running: true,
++      runningSubagentCount: 0, completed: false, updatedAt: 0,
++    }
++    render(<SessionNodeItem
++      node={node} currentId={undefined} now={0} onOpen={vi.fn()} meta="Project Alpha" t={t}
++    />)
++    const title = screen.getByText('Session')
++    const meta = screen.getByText('Project Alpha')
++    expect(title.nextElementSibling).toBe(meta)
++    expect(meta.className).toMatch(/meta/)
++    expect(screen.getByRole('treeitem').querySelector('[data-state="ongoing"]')).toBeTruthy()
++    expect(screen.queryByRole('button', { name: /会话.*的操作/ })).toBeNull()
++  })
++
++  it('uses the complete project section for drag hit testing and its insertion marker', () => {
++    const drag: ProjectGroupDragProps = {
++      active: true, marker: 'after', hover: vi.fn(), drop: vi.fn(),
++    }
++    render(<ProjectGroupItem drag={drag}>
++      <div>header</div>
++      <div>visible child session</div>
++    </ProjectGroupItem>)
++    const group = screen.getByText('header').parentElement as HTMLElement
++    group.getBoundingClientRect = () => ({
++      top: 100, bottom: 200, left: 0, right: 200, width: 200, height: 100,
++      x: 0, y: 100, toJSON: () => ({}),
++    })
++    fireDrag(group, 'dragOver', 175)
++    expect(drag.hover).toHaveBeenCalledWith('after')
++    fireDrag(group, 'drop', 125)
++    expect(drag.drop).toHaveBeenCalledWith('before')
++    expect(group.className).toMatch(/projectDropAfter/)
++  })
++
++  it('shares the project overflow control', () => {
++    const onToggle = vi.fn()
++    const view = render(<SessionOverflowButton expanded={false} remaining={7} onToggle={onToggle} t={t} />)
++    fireEvent.click(screen.getByRole('button'))
++    expect(onToggle).toHaveBeenCalledOnce()
++    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('false')
++    view.rerender(<SessionOverflowButton expanded remaining={7} onToggle={onToggle} t={t} />)
++    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
++  })
++
+   it('shows the green done dot only on a finished, unviewed session (live activity wins the slot)', () => {
+     const renderRow = (over: Partial<SessionNode>) => render(
+       <SessionNodeItem
+diff --git a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
+index 820d2bd66b..6b8505444a 100644
+--- a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
++++ b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
+@@ -154,7 +154,7 @@ describe('WorkspaceBrowser', () => {
+     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
+     expect(screen.getByRole('separator')).toBeTruthy()
+     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+-      '按工作区', '单列表', '手动排序', '最近更新',
++      '按工作区', '单列表', '按预设', '手动排序', '最近更新',
+     ])
+     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
+     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
+@@ -180,6 +180,27 @@ describe('WorkspaceBrowser', () => {
+     expect(b.store.getSnapshot().groupBy).toBe('workspace')
+   })
+
++  it('shares the official session actions with the preset grouping occupant', () => {
++    let presetOwner: unknown
++    const b = mount({
++      renderSlot: ((name: string, owner: unknown) => {
++        if (name === 'sidebar.workspaces.presetGroups') presetOwner = owner
++        return null
++      }) as never,
++    })
++
++    act(() => { b.store.actions.setGroupBy('preset') })
++
++    const actions = (presetOwner as {
++      sessionActions?: { onRename?: unknown; onFork?: unknown; onArchive?: unknown }
++    } | undefined)?.sessionActions
++    expect(actions).toEqual({
++      onRename: expect.any(Function),
++      onFork: expect.any(Function),
++      onArchive: expect.any(Function),
++    })
++  })
++
+   it('persists flat-list drag order locally and applies Last updated within that account', async () => {
+     const insertSessionBefore = vi.fn(async () => {})
+     const sessions = sessionState([summary('one', 3), summary('two', 2), summary('three', 1)])
+@@ -879,9 +900,9 @@ describe('WorkspaceBrowser', () => {
+     })
+     fireEvent.dragStart(source, { dataTransfer: dragData() })
+     fireDrag(firstSection, 'dragOver', 105)
+-    expect(firstSection.parentElement?.className).toContain('listTopDropActive')
+     const marker = firstSection.parentElement?.previousElementSibling
+     expect(marker?.className).toContain('listTopDropIndicator')
++    expect(firstSection.className).not.toContain('projectDropBefore')
+   })
+
+   it('accepts a document-level drop and commits the last Workspace marker on drag end', () => {

@@ -1,0 +1,142 @@
+{
+  "kind": "realization",
+  "id": "preset-manager-linux-web",
+  "revision": "0.1.0-candidate.3",
+  "status": "candidate",
+  "protocol": {
+    "id": "meta-intent",
+    "revision": "0.2"
+  },
+  "package": {
+    "id": "dsh-preset-manager",
+    "revision": "0.1.0-draft.15"
+  },
+  "state": {
+    "revision": "0.1.0-draft.15",
+    "entry": {
+      "path": "inputs/state/STATE.json",
+      "digest": "sha256:33d3969c1a2020cafb7ede25bfc51ca3df6bcdc2e9129395a2e2428a5af1d123"
+    },
+    "document": {
+      "path": "inputs/state/STATE.md",
+      "digest": "sha256:d1b4b5be7bb1e4ec6d83932d5d1f76505a7ec33f8838f8beb1c1287e4542bdb6"
+    }
+  },
+  "logs": [
+    {
+      "path": "../../logs/2026-08-26-source-and-verbatim-audit.md",
+      "digest": "sha256:b311fb8a61b60df75cfd38c06974790cd8a3f213277684908a3b2ce6aa6328f3"
+    },
+    {
+      "path": "../../logs/2026-08-26-reconstructed-product-intent.md",
+      "digest": "sha256:82b0c334ebe1edaeed5b31723c720437e941b17dac27a064f53a2be91c455f64"
+    },
+    {
+      "path": "../../logs/2026-08-26-reconstruction-verification.md",
+      "digest": "sha256:4b875ffc08fbacf2c68bcda633d929d968fdf16570e5883febc98f49067bc003"
+    },
+    {
+      "path": "../../logs/2026-08-26-user-original-intent.md",
+      "digest": "sha256:c9b9c0e39fb15b19e614b0af3c23a8b9a4b07224ad13fb4cd0a1f7d5cd2745e5"
+    },
+    {
+      "path": "../../logs/2026-08-26-description-and-create-flow-clarification.md",
+      "digest": "sha256:8fe2e0a8f7a3dbcfdd45791d883fa56028a2861124c71ec1ba6a54685bd4cf02"
+    },
+    {
+      "path": "../../logs/2026-08-26-session-actions-repair-and-adapter-direction.md",
+      "digest": "sha256:96e0aa49dfac0bf6e9a2199c27597866be0aeebe81d29c987d6c436ea1e8bd27"
+    },
+    {
+      "path": "../../logs/2026-08-26-dsh-std-non-adoption.md",
+      "digest": "sha256:a6c077124a132459dd3682ffe8d0032bd71a21cb2ce46c8df9825d5450bf5d92"
+    },
+    {
+      "path": "../../logs/2026-08-26-preexisting-patch-ownership-repair.md",
+      "digest": "sha256:604ff96400e4a29a0545c1609dea42161defe0fa7f436cbc7f3c949890231854"
+    },
+    {
+      "path": "../../logs/2026-08-26-source-region-ownership-practice.md",
+      "digest": "sha256:039a4c2e631e0e5372ac72aa3f56fed6f2f919ccd0d60ae652bfa9c0ba308634"
+    },
+    {
+      "path": "../../logs/2026-08-26-marker-locator-simplification.md",
+      "digest": "sha256:83d2d42ab6ddc5c510bd30d431de4f9c801293039e763a4720b622d7b8541145"
+    },
+    {
+      "path": "../../logs/2026-08-26-purpose-comment-marker-correction.md",
+      "digest": "sha256:a7c26c82da20f9d80d2b475bc52c328408132f140913cdc48a64562137992fce"
+    },
+    {
+      "path": "../../logs/2026-08-26-remote-baseline-correction.md",
+      "digest": "sha256:1c81d9f864a374a534c6e6874adda512b3c2f3135cc6e8c82a0bd1f1b21c842a"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "artifacts/acceptance.md",
+      "digest": "sha256:d6220c37e73d0807dca19ce8a34f12a0978de897ef2c62e0beacde1de6a90495"
+    },
+    {
+      "path": "artifacts/install.md",
+      "digest": "sha256:644fce757bcc3a75e49ec5bda504dad4e21506f76186e12f834c670962615435"
+    }
+  ],
+  "target": {
+    "kind": "git",
+    "uri": "https://github.com/sch246/dsh-preset-manager.git",
+    "commit": "e82f6dcf83fab6e795b0bc5c4abf7fdfcfc14095",
+    "paths": [
+      "README.md",
+      "DESIGN.md",
+      "package.json",
+      "cordis.patch.yml",
+      "patches/harness-groupby-preset.patch",
+      "scripts",
+      "src",
+      "tests",
+      "tsconfig.client.json",
+      "tsconfig.json",
+      "tsdown.config.ts",
+      "vitest.config.ts"
+    ]
+  },
+  "acceptance": {
+    "status": "incomplete",
+    "evidence": [
+      {
+        "id": "official-remote-baseline-applicability",
+        "observedOn": "2026-08-26",
+        "artifact": "artifacts/acceptance.md",
+        "result": "the patch applies to detached origin/master b150a551 both alone and after right-sidebar"
+      },
+      {
+        "id": "nearby-purpose-comment-locators",
+        "observedOn": "2026-08-26",
+        "artifact": "artifacts/acceptance.md",
+        "result": "29 package boundaries with ordinary purpose comments balance per owner; purpose prose remains navigation only"
+      },
+      {
+        "id": "exact-reverse-applicability",
+        "observedOn": "2026-08-26",
+        "artifact": "artifacts/acceptance.md",
+        "result": "the tracked patch reverses cleanly on the selected combined local assembly checkout"
+      },
+      {
+        "id": "generated-surface-composition",
+        "observedOn": "2026-08-26",
+        "artifact": "artifacts/acceptance.md",
+        "result": "shared catalogs are excluded from patch ownership and regenerated from current source contributions"
+      }
+    ]
+  },
+  "authority": {
+    "decision": "pending-user-review"
+  },
+  "unresolved": [
+    "candidate 3 build and test execution",
+    "live preset-mode and session-action acceptance",
+    "owned install/uninstall and unrelated-drift preservation exercise",
+    "large-list and error-recovery UX"
+  ]
+}

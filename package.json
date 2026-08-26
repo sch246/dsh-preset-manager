@@ -29,6 +29,7 @@
   "scripts": {
     "build": "bash scripts/build.sh",
     "setup": "bash scripts/setup.sh",
+    "uninstall": "bash scripts/uninstall.sh",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
   },

@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.7",
+  "revision": "0.1.0-draft.8",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -12,7 +12,8 @@
     "../logs/2026-08-26-description-and-create-flow-clarification.md",
     "../logs/2026-08-26-session-actions-repair-and-adapter-direction.md",
     "../logs/2026-08-26-dsh-std-non-adoption.md",
-    "../logs/2026-08-26-preexisting-patch-ownership-repair.md"
+    "../logs/2026-08-26-preexisting-patch-ownership-repair.md",
+    "../logs/2026-08-26-source-region-ownership-practice.md"
   ],
   "protocol": {
     "id": "meta-intent",

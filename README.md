@@ -28,11 +28,12 @@ bash scripts/setup.sh              # 见下：补丁 + 重建 + 注册 bundle
 `scripts/setup.sh` 依次做四件事（任一步失败即中止）：
 
 1. 从本仓库受 Git 跟踪的 `patches/harness-groupby-preset.patch` 识别“尚未应用/已完整应用/冲突”三种状态；已应用可重复安装，冲突不改宿主；
-2. 应用（或复用）补丁，记录补丁 SHA-256 与本次 setup 的实际所有权，并重建被改包：`pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle`；
-3. 构建本插件（`scripts/build.sh`，自动探测 `DSH_CHECKOUT`）；
-4. `dsh plugin --profile web add .` 注册 bundle。
+2. 应用（或复用）补丁，核对就近的 `@meta-intent` source-region owner 标记，随后从当前全部源贡献重生成共享 slot/API catalog；补丁本身不静态拥有生成文件；
+3. 记录补丁 SHA-256、owner region、生成物映射与本次 setup 的实际所有权，并重建被改包：`pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle`；
+4. 构建本插件（`scripts/build.sh`，自动探测 `DSH_CHECKOUT`）；
+5. `dsh plugin --profile web add .` 注册 bundle。
 
-最后**重启 dsh web**。回滚：`bash scripts/uninstall.sh`；它只撤销由 setup 实际应用且仍完全匹配的补丁；预先存在的相同 Host 效果不会被本插件认领或删除。
+最后**重启 dsh web**。回滚：`bash scripts/uninstall.sh`；它只撤销由 setup 实际应用且仍完全匹配的补丁，再从剩余源贡献重生成共享 catalog；预先存在的相同 Host 效果不会被本插件认领或删除。
 
 > 故障排查：如果 `github:` 安装卡在 `git ls-remote git@github.com:...`（pnpm 把 GitHub 解析成 SSH），改用 HTTPS clone + 本地路径安装：
 > ```bash

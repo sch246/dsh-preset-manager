@@ -31,6 +31,11 @@ if [ -f "$STATE_FILE" ]; then
   RECORDED_OWNED="$(sed -n 's/^patch_applied_by_setup=//p' "$STATE_FILE")"
 fi
 
+regenerate_shared_catalogs() {
+  echo "regenerating shared client catalogs from the remaining source contributions..."
+  (cd "$CHECKOUT" && pnpm run gen-client-catalog && pnpm run gen-cordis-api)
+}
+
 if [ "$RECORDED_SHA" != "$PATCH_SHA" ]; then
   echo "uninstall: no matching setup provenance; preserving Host files" >&2
   echo "uninstall: run setup from this exact plugin revision before uninstalling its patch" >&2
@@ -40,6 +45,7 @@ elif [ "$RECORDED_OWNED" != "true" ]; then
 elif git -C "$CHECKOUT" apply --check --reverse "$PATCH" 2>/dev/null; then
   echo "rolling back the exact recorded harness patch..."
   git -C "$CHECKOUT" apply --reverse "$PATCH"
+  regenerate_shared_catalogs
   rm -f "$STATE_FILE"
   echo "rebuilding ui-workspace bundle..."
   (cd "$CHECKOUT" && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)

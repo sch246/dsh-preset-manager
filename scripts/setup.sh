@@ -39,6 +39,26 @@ if [ -f "$STATE_FILE" ]; then
 fi
 PATCH_APPLIED_BY_SETUP=false
 
+verify_source_markers() {
+  local needle='"package":"dsh-preset-manager"'
+  local paths=(
+    packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
+    packages/client/ui-workspace/src/client/contract/slots.ts
+    packages/client/ui-workspace/src/client/rows/Rows.tsx
+  )
+  for path in "${paths[@]}"; do
+    if ! grep -Fq "$needle" "$CHECKOUT/$path"; then
+      echo "setup: ownership marker missing from $path" >&2
+      return 1
+    fi
+  done
+}
+
+regenerate_shared_catalogs() {
+  echo "regenerating shared client catalogs from all currently installed source contributions..."
+  (cd "$CHECKOUT" && pnpm run gen-client-catalog && pnpm run gen-cordis-api)
+}
+
 echo "checking tracked harness patch against $CHECKOUT..."
 if git -C "$CHECKOUT" apply --check --reverse "$PATCH" 2>/dev/null; then
   if [ "$RECORDED_SHA" = "$PATCH_SHA" ] && [ "$RECORDED_OWNED" = "true" ]; then
@@ -58,10 +78,16 @@ else
   exit 1
 fi
 
+verify_source_markers
+regenerate_shared_catalogs
+
 {
   echo "patch_sha256=$PATCH_SHA"
   echo "patch_applied_by_setup=$PATCH_APPLIED_BY_SETUP"
   echo "host_head=$(git -C "$CHECKOUT" rev-parse HEAD)"
+  echo "marker_schema=meta-intent-source-region/0.1"
+  echo "regions=sidebar.workspaces.presetGroups,workspace.rows.alternateGrouping,workspace.groupBy.preset"
+  echo "generated_catalogs=packages/extensions/cordis-client-runner/src/client/slot-catalog.ts,packages/extensions/cordis-client-runner/src/client/api-catalog.ts"
 } > "$STATE_FILE"
 
 echo "rebuilding ui-workspace bundle..."

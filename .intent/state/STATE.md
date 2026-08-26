@@ -45,6 +45,7 @@ The plugin should feel like a native extension of the existing workspace and new
 - Installation detects whether the required Harness compatibility change is absent, already present or conflicting before modifying the target.
 - An upgrade conflict stops for investigation instead of force-applying a patch.
 - Uninstall removes the plugin and only reverses the exact compatibility contribution it installed when current target drift makes that safe; unrelated later changes are preserved.
+- Every logical compatibility intervention is marked next to the governed source region. Shared generated catalogs are rebuilt from remaining source contributions after install or uninstall and are not statically claimed by this package.
 
 ## Observable acceptance
 
@@ -54,7 +55,7 @@ The plugin should feel like a native extension of the existing workspace and new
 - `PM-004`: In preset mode, each session row still exposes and successfully performs the ordinary rename, fork and archive actions through its overflow surface.
 - `PM-005`: Pure tests cover first install, schema migration and both sides of the complete-order, default-visible and all-hidden invariants, plus grouping/search/order derivation.
 - `PM-006`: Typecheck, tests and build pass against a declared Harness baseline; the compatibility patch passes a forward-or-already-applied check without partial target mutation.
-- `PM-007`: A recorded install → target-drift inspection → uninstall exercise removes owned effects, restores the official selector, and preserves an unrelated target modification.
+- `PM-007`: A recorded install → target-drift inspection → uninstall exercise removes owned effects, restores the official selector, preserves an unrelated target modification, verifies nearby source-region ownership markers, and re-synthesizes shared generated catalogs from the remaining source contributions.
 
 ## Constraints and permissions
 
@@ -83,6 +84,7 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 - The user subsequently tested the current creation flow and reported that it satisfies the observable requirement to reach the official creation interface with workspace and preset preselected.
 - The session-action mismatch has a source-level repair: the owner contract now requires rename, fork and archive callbacks and preset rows pass them to the official renderer. The focused Harness suite passes 45 tests, preset-manager passes 27 tests, both typechecks and both builds pass, and the regenerated patch reverses cleanly. Live deployed menu confirmation remains outstanding.
 - Local compatibility target: `/root/deepseek-harness`; this path is bootstrap evidence, not a portable package requirement.
+- Candidate 1 practices nearby source-region attribution for the three compatibility regions and removes generated slot/API catalogs from exclusive patch ownership. Its receipt records the source-to-generated mapping, while setup and uninstall regenerate the catalogs from the current source tree.
 
 ## Implementation hints
 
@@ -92,7 +94,7 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 
 ## Open tensions
 
-- The current v4 implementation has not been sealed or exercised end to end under this intent package; committing source does not by itself create a realization lock or acceptance.
+- Candidate 1 is being prepared for the current v4 implementation. Nearby attribution and generated-surface composition are recorded, but the realization is not accepted and its live lifecycle remains unexercised.
 - The user's postscript exposed a session-row overflow mismatch. Source and regression evidence now show it repaired, but PM-004 still needs a deployed interaction check before it is accepted.
 - The exact UX for no-workspace creation failure, broken presets, large preset lists and error recovery is not explicit enough to treat as accepted.
 - Runtime, current-source drift maintenance and owned uninstall evidence remain absent from this package.

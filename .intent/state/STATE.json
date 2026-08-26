@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.11",
+  "revision": "0.1.0-draft.12",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -14,7 +14,8 @@
     "../logs/2026-08-26-dsh-std-non-adoption.md",
     "../logs/2026-08-26-preexisting-patch-ownership-repair.md",
     "../logs/2026-08-26-source-region-ownership-practice.md",
-    "../logs/2026-08-26-marker-locator-simplification.md"
+    "../logs/2026-08-26-marker-locator-simplification.md",
+    "../logs/2026-08-26-purpose-comment-marker-correction.md"
   ],
   "protocol": {
     "id": "meta-intent",
@@ -40,7 +41,5 @@
     }
   ],
   "activeLocks": [],
-  "candidateLocks": [
-    "../locks/preset-manager-linux-web-0.1.0-candidate.1/LOCK.json"
-  ]
+  "candidateLocks": []
 }

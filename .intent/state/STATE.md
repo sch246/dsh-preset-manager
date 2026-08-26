@@ -85,6 +85,7 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 - The session-action mismatch has a source-level repair: the owner contract now requires rename, fork and archive callbacks and preset rows pass them to the official renderer. The focused Harness suite passes 45 tests, preset-manager passes 27 tests, both typechecks and both builds pass, and the regenerated patch reverses cleanly. Live deployed menu confirmation remains outstanding.
 - Local compatibility target: `/root/deepseek-harness`; this path is bootstrap evidence, not a portable package requirement.
 - Candidate 1 practices compact package-delimited locators for the three compatibility regions and removes generated slot/API catalogs from exclusive patch ownership. Begin lines carry only ordinary `(purpose: ...)` commentary; its receipt carries realization and source-to-generated ownership evidence, while setup and uninstall regenerate the catalogs from the current source tree.
+- The reproducible Harness target is official remote commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`. Local `b642a106` is a five-commit-ahead skill-enablement assembly context rather than remote authority; the current patch applies cleanly to `b150a551` both alone and after right-sidebar.
 
 ## Implementation hints
 

@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.13",
+  "revision": "0.1.0-draft.14",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -15,7 +15,8 @@
     "../logs/2026-08-26-preexisting-patch-ownership-repair.md",
     "../logs/2026-08-26-source-region-ownership-practice.md",
     "../logs/2026-08-26-marker-locator-simplification.md",
-    "../logs/2026-08-26-purpose-comment-marker-correction.md"
+    "../logs/2026-08-26-purpose-comment-marker-correction.md",
+    "../logs/2026-08-26-remote-baseline-correction.md"
   ],
   "protocol": {
     "id": "meta-intent",
@@ -37,11 +38,10 @@
       "id": "target.deepseek-harness",
       "kind": "git-checkout",
       "uri": "file:///root/deepseek-harness",
-      "scope": "local-bootstrap-and-compatibility-investigation"
+      "revision": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+      "scope": "official-remote-reproducible-baseline; local assembly is dirty on b642a106"
     }
   ],
   "activeLocks": [],
-  "candidateLocks": [
-    "../locks/preset-manager-linux-web-0.1.0-candidate.2/LOCK.json"
-  ]
+  "candidateLocks": []
 }

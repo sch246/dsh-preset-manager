@@ -763,3 +763,46 @@ index eaaccfcb20..e47e25f2cc 100644
 +  // @meta-intent:begin dsh-preset-manager session.agentPresetSelectionCatalog
 +  sessionAgentPresets: 'session.md',
 +  // @meta-intent:end dsh-preset-manager session.agentPresetSelectionCatalog
+diff --git a/packages/api/session-controller/src/preset-selection.ts b/packages/api/session-controller/src/preset-selection.ts
+new file mode 100644
+index 0000000000..1e23ab0a62
+--- /dev/null
++++ b/packages/api/session-controller/src/preset-selection.ts
+@@ -0,0 +1,37 @@
++// @meta-intent:begin dsh-preset-manager session.agentPresetSelectionRemote
++/** Session-addressed Host adapter for Agent preset selection. */
++
++import { Context } from '@deepseek-ai/cordis'
++import type { SessionId } from '@deepseek-ai/dsh-session'
++import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
++
++declare module '@deepseek-ai/cordis' {
++  interface Context {
++    /** Session-addressed Host adapter for the `agentPresets/select` endpoint. */
++    sessionAgentPresets: SessionAgentPresets
++  }
++}
++
++/** Owns the raw-Session-id `agentPresets/select` Remote endpoint. */
++export class SessionAgentPresets extends TypertRemoteService {
++  static inject = ['sessionController']
++
++  /** @param ctx - Host context carrying the Session Controller. */
++  constructor(ctx: Context) {
++    super(ctx, 'sessionAgentPresets', { namespace: 'agentPresets' })
++  }
++
++  /**
++   * Select a preset through the Session Controller activation transaction.
++   * @param sessionId - live or persisted ordinary Session identity.
++   * @param agentPreset - target preset id.
++   * @returns the preset id committed to the Session.
++   */
++  @Remote('select')
++  select(sessionId: SessionId, agentPreset: string): Promise<string> {
++    return this.ctx.sessionController.selectAgentPreset(sessionId, agentPreset)
++  }
++}
++
++export default SessionAgentPresets
++// @meta-intent:end dsh-preset-manager session.agentPresetSelectionRemote

@@ -43,18 +43,19 @@
 3. **`contract/slots.ts`**：SlotMap 增补子槽键，导出 owner props `PresetGroupsOwnerProps { wide, query, rows, sessionActions }`；`rows: PresetRowsOwner` 由 Workspace owner 提供官方 Session 投影、工作区标签和行渲染席位，`sessionActions` 强制携带官方重命名／分叉／归档动作，避免备选分组静默丢失会话菜单。同时把 `WorkspaceBrowserProps` 的渲染槽联合扩为
    `'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.presetGroups'`
    （否则 `renderSlot` 的类型面只认得 directoryFlow 一个子键）。
-4. **`client/index.ts`** register 调用的 `children` 表增补：
+4. **`rows/Rows.tsx` + `rows/Rows.module.css`**：官方 Session 行在标题之后渲染一个整体右对齐的紧凑元数据块，块内先放工作区标签、留出间隔、最右保留相对时间。标签可收缩并省略，时间不可收缩；插件只提交标签 ReactNode，不复制官方行 CSS。
+5. **`client/index.ts`** register 调用的 `children` 表增补：
    ```ts
    'sidebar.workspaces.presetGroups': { kind: 'single', scope: 'root' }
    ```
-5. **`WorkspaceBrowser.tsx`**：
+6. **`WorkspaceBrowser.tsx`**：
    - `ViewOptionsMenu` 菜单项加 `{ id: 'preset', label: t('groupBy.preset') }`；`groupBy`/`onGroupPick` 改收 `SessionGroupBy`；
    - 列表主体分支：`groupBy === 'preset'` 时优先渲染
       `renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery, rows: presetRows })`
      （preset 模式下搜索态交给插件树做标题过滤，不再走全局内容搜索）；
    - 节标题：`'preset'` 时用 `t('section.presets')`。
-6. **历史 Session 投影回填**：session-projection 判断当前 client-visible checkpoint 是否完整；session-projection-cache 把完整性随缓存快照暴露；session-controller 在既有物理大小上限内重折叠不完整冷缓存并回写派生 checkpoint。相关包 README、测试、Agent Note 与 generator 链接映射同属静态补丁。
-7. **冷 Session 的目标 preset 激活**：`agentPresets/select` wire endpoint 保持 `(SessionId, presetId)`，由 Session Controller 接管原始 Session id。已有空白 Agent 走领域切换；冷空白 Session 直接在目标 preset 下恢复，并在完整 Agent 发布成功后追加选择事件。旧 preset 缺失不会抢先令目标选择失败；共享的无关恢复失败会按请求目标重试。Agent Presets 与 Session Controller 的 README、测试和 Agent Note 同属静态补丁。
+7. **历史 Session 投影回填**：session-projection 判断当前 client-visible checkpoint 是否完整；session-projection-cache 把完整性随缓存快照暴露；session-controller 在既有物理大小上限内重折叠不完整冷缓存并回写派生 checkpoint。相关包 README、测试、Agent Note 与 generator 链接映射同属静态补丁。
+8. **冷 Session 的目标 preset 激活**：`agentPresets/select` wire endpoint 保持 `(SessionId, presetId)`，由 Session Controller 接管原始 Session id。已有空白 Agent 走领域切换；冷空白 Session 直接在目标 preset 下恢复，并在完整 Agent 发布成功后追加选择事件。旧 preset 缺失不会抢先令目标选择失败；共享的无关恢复失败会按请求目标重试。Agent Presets 与 Session Controller 的 README、测试和 Agent Note 同属静态补丁。
 
 补丁**不**静态持有：共享 slot/API catalog、生成的 subsystem 文档和 Host `lib/`；setup/uninstall 从剩余源贡献重生成并重建。搜索栏本身、"添加工作区"按钮（preset 模式下保留，v1 可接受）、工作区/扁平两模式的任何逻辑也不改变。
 
@@ -73,7 +74,7 @@ ctx.slots.inject('sidebar.workspaces.presetGroups', () => ctx.slots.register({
 - `PropsStore`：本插件 store（完整 `order` + `hidden` + overrides）；
 - inject face：侧栏树使用 `loadRoster()`、`open(id)`、`startSessionByPreset(id)` 等；hero 选择器独占 `setDefault(id)`。
 
-插件不运行时导入 ui-workspace 的 React 行，也不复制其 CSS。它只把说明、操作和 Session 的 Workspace／项目标识放入官方行预留的 `meta`、`rowActions` 席位。折叠、五行溢出、运行态动画和整组拖拽预览均由 ui-workspace 实现。
+插件不运行时导入 ui-workspace 的 React 行，也不复制其 CSS。它只把说明、操作和 Session 的 Workspace／项目标识放入官方行预留的 `meta`、`rowActions` 席位；ui-workspace 把 `meta` 放在右侧元数据块的相对时间之前，并负责间隔、截断和时间不可收缩。折叠、五行溢出、运行态动画和整组拖拽预览均由 ui-workspace 实现。
 
 ### 3.3 补丁的安装与回滚（`scripts/`）
 
@@ -235,7 +236,7 @@ src/client/
 ## 10. 验证
 
 - STATE 是行为权威；本插件不维护复制语义的测试矩阵或 test gate。
-- `typecheck` + `build` 只检查类型与产物；最终验收在补丁 apply、重建和插件装配后，使用真实 Web UI 与真实 settings 持久化直接按 STATE 检查选择器优先级、默认 set/unset、managed order、失败提示与官方设置互同步，并观察刷新与服务重启后的状态。
+- `typecheck` + `build` 只检查类型与产物；最终验收在补丁 apply、重建和插件装配后，使用真实 Web UI 与真实 settings 持久化直接按 STATE 检查选择器优先级、默认 set/unset、managed order、失败提示与官方设置互同步，并观察刷新与服务重启后的状态。会话行需在普通和窄侧栏宽度确认 `标题 | [工作区  相对时间]`、长工作区标签截断、时间保留及 hover 操作。
 - Harness 重量门禁不适用于外部仓库。
 
 ## 11. 仓库布局（含补丁）

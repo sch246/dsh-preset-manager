@@ -961,7 +961,7 @@ index c08fd931de..fc6032255b 100644
 +  'groupBy.preset': 'By preset',
 +  // @meta-intent:end dsh-preset-manager
 diff --git a/packages/client/ui-workspace/src/client/rows/Rows.module.css b/packages/client/ui-workspace/src/client/rows/Rows.module.css
-index 02a99ee5a0..4039977194 100644
+index 02a99ee5a0..42e7902bac 100644
 --- a/packages/client/ui-workspace/src/client/rows/Rows.module.css
 +++ b/packages/client/ui-workspace/src/client/rows/Rows.module.css
 @@ -0,0 +1,51 @@
@@ -1016,14 +1016,28 @@ index 02a99ee5a0..4039977194 100644
 +  opacity: 0.55;
 +}
 +
-@@ -202,0 +254,6 @@
-+.sessionRow .meta {
-+  flex: none;
+@@ -202,0 +254,20 @@
++.sessionMeta {
++  flex: 0 1 auto;
++  min-width: 0;
 +  max-width: 40%;
-+  margin-right: 6px;
++  margin-left: auto;
++  display: inline-flex;
++  align-items: center;
++  justify-content: flex-end;
++  gap: 6px;
 +}
 +
-@@ -338,0 +396,21 @@
++.sessionMeta .meta {
++  flex: 1 1 auto;
++  min-width: 0;
++}
++
++.sessionMeta .time {
++  flex: none;
++}
++
+@@ -338,0 +410,21 @@
 +.sessionOverflowButton {
 +  width: 100%;
 +  height: 28px;
@@ -1046,7 +1060,7 @@ index 02a99ee5a0..4039977194 100644
 +}
 +
 diff --git a/packages/client/ui-workspace/src/client/rows/Rows.tsx b/packages/client/ui-workspace/src/client/rows/Rows.tsx
-index 012c2d6869..78ab52fc5c 100644
+index 012c2d6869..599f1924f9 100644
 --- a/packages/client/ui-workspace/src/client/rows/Rows.tsx
 +++ b/packages/client/ui-workspace/src/client/rows/Rows.tsx
 @@ -8,0 +9 @@ import { useState } from 'react'
@@ -1231,7 +1245,7 @@ index 012c2d6869..78ab52fc5c 100644
 +/** Props for the official Session row. */
 +export interface SessionNodeItemProps {
 @@ -375,0 +437,2 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
-+  /** Grouping-dimension context rendered in the official metadata seat. */
++  /** Grouping label shown before relative time in the row's right-aligned metadata block. */
 +  meta?: ReactNode
 @@ -377 +440,5 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
 -}) {
@@ -1240,9 +1254,21 @@ index 012c2d6869..78ab52fc5c 100644
 +export function SessionNodeItem({
 +  node, currentId, now, onOpen, onRename, onFork, onArchive, meta, drag, flat = false, t,
 +}: SessionNodeItemProps) {
-@@ -443,0 +511 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
-+      {meta !== undefined && <span className={css.meta}>{meta}</span>}
-@@ -483,0 +552,27 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
+@@ -439,5 +506,8 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
+-      {/* A blank New Session row is a provisional placeholder: nothing has
+-          happened in it yet, so a "now" timestamp and the row verbs
+-          (rename/fork/archive) would all act on content that does not
+-          exist — both trailing cells stay off until the first prompt. */}
+-      {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
++      {/* A blank New Session row has no relative time or row verbs until its
++          first prompt; grouping metadata may still identify its Workspace. */}
++      {(meta !== undefined || !row.blank) && (
++        <span className={css.sessionMeta}>
++          {meta !== undefined && <span className={css.meta}>{meta}</span>}
++          {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
++        </span>
++      )}
+@@ -483,0 +554,27 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
 +// @meta-intent:end dsh-preset-manager
 +
 +// @meta-intent:begin dsh-preset-manager (purpose: expose the official Session overflow control to alternate groupings)

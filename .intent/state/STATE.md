@@ -15,7 +15,7 @@ The plugin should feel like a native extension of the existing workspace and new
 - The official view-options menu offers a preset grouping mode alongside existing modes.
 - Sessions are grouped under their agent preset; sessions with no resolvable preset remain discoverable in an ungrouped fallback.
 - Its structure, styling, search, expansion, session status, interaction and row behavior reuse the official “按工作区” experience as far as practical.
-- Session rows identify their workspace and retain the ordinary row overflow actions, including rename, fork and archive.
+- Session rows identify their workspace in the existing compact grey metadata area on the right, not in the title area. The right-aligned block presents the workspace label before relative time with a visible gap; a long label truncates before it can shrink, displace or hide the relative-time item. Rows retain the ordinary overflow actions, including rename, fork and archive.
 
 ### P2. Manage one coherent preset display projection
 
@@ -52,7 +52,7 @@ The plugin should feel like a native extension of the existing workspace and new
 
 ## Observable acceptance
 
-- `PM-001`: In a running supported Harness profile, selecting “按预设” displays preset groups, workspace-labelled official session rows and an ungrouped fallback where applicable; existing non-preset grouping modes still work.
+- `PM-001`: In a running supported Harness profile, selecting “按预设” displays preset groups, workspace-labelled official session rows and an ungrouped fallback where applicable; existing non-preset grouping modes still work. Each row keeps its title on the left and a compact grey block on the right whose workspace label precedes the rightmost relative time with visible spacing; at narrow width, a long label truncates without displacing or hiding the time.
 - `PM-002`: Reorder, hide/unhide and display-rename operations survive reload according to P2; the new-conversation selector marks, sets and clears the explicit user default, preserves its pending selection when clearing, and falls back through the recent Session preset then managed order; long descriptions wrap in the editor, accepted line breaks survive the data path, and an external user-default change is reflected without moving the preset or creating contradictory state.
 - `PM-003`: The preset `+` action allows workspace selection and reaches the ordinary create-conversation interface with workspace and preset preselected; hidden presets do not appear in the selector and visible presets follow the managed order.
 - `PM-004`: In preset mode, each session row still exposes and successfully performs the ordinary rename, fork and archive actions through its overflow surface.
@@ -90,6 +90,8 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 - The user observed that starting PTC from a preset group and choosing the `root` workspace opened a reused blank Session under the Host default. Runtime evidence first showed the Host opening before selection, then exposed both a root-handler scope mismatch and a Host lookup that resumes the deleted historical preset before processing the requested replacement. The selected repair binds the start handler from root services, connects the workspace, selects the preset on the resulting Session through a Session-id BFF that can repair blank cold Sessions, and opens only after selection succeeds; started Sessions remain locked and seat reconciliation remains optional and conversation-scoped.
 - The user observed that historical Sessions did not populate preset groups. Their persisted headers contain preset identity, but older derived projection-cache records can lack the later-added `agentPreset` row. The selected repair treats a cache cut as complete only when every currently registered client-visible projection is usable, refreshes incomplete bounded cold reads from the complete log, and requires a one-time maintenance pass for historical logs outside the ordinary list budget.
 - The session-action mismatch has a source-level repair: the owner contract requires rename, fork and archive callbacks and preset rows pass them to the official renderer. Earlier mechanical checks and a clean patch reversal do not replace live deployed menu confirmation, which remains outstanding.
+- The user clarified that the preset Session row's workspace label belongs before relative time inside one right-aligned metadata block. The Host patch gives the label the shrinkable, ellipsized position and keeps time non-shrinking; deployed ordinary-width, narrow-width and hover observation remains outstanding.
+- The draft.22 source repair's Host patch has digest `sha256:0484bfaab562180c1d9fe12c709c21bb8ac4bb95dacb284ffec5dd6eacd0e45e` against official Harness base `cd5ef8148158c3a752a658978873241fdf8e2bbc`. It has no deployment receipt or realization lock; candidate.4 remains the historical deployed patch identity.
 - Local compatibility target: `/root/deepseek-harness`; this path is bootstrap evidence, not a portable package requirement.
 - Candidate.4 selects committed plugin source `21c3ad6fc9cf11228a8630f4dab3fc51d33eb9b1`, Host patch digest `sha256:c1c016096d03ad699831008a5472a69182765584efe6df7884a4820c8bac70a0`, and official Harness `origin/master` base `cd5ef8148158c3a752a658978873241fdf8e2bbc`. The dirty local assembly is deployment evidence only; it is not represented as a publishable Harness commit. The receipt records every owned source region and the generated catalogs rebuilt by setup and uninstall.
 - The last three candidates remain historical evidence for earlier compatibility regions and source identities. Setup and uninstall regenerate shared catalogs from the current source tree.
@@ -104,6 +106,7 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 
 - Candidate.4 binds draft.20 to the committed source identity, exact Host patch, deployment receipt, validation commands, historical projection counts and a live root-workspace PTC start.
 - The user's postscript exposed a session-row overflow mismatch. A source repair exists, but PM-004 still needs a deployed interaction check before it is accepted.
+- The row metadata order and long-label truncation need deployed observation at ordinary and narrow sidebar widths; mechanical patch checks do not accept PM-001.
 - The exact UX for no-workspace creation failure, broken presets, large preset lists and error recovery is not explicit enough to treat as accepted.
 - The new-conversation default marker, repeat-selection action and visible write failure require deployed interaction evidence before they are accepted.
 - Runtime, current-source drift maintenance and owned uninstall evidence remain absent from this package.

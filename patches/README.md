@@ -1,9 +1,10 @@
 # patches/
 
 `harness-groupby-preset.patch` 是本插件对 Harness 的**唯一权威介入**。它包含
-ui-workspace 的 preset 分组席位，以及历史 Session 缺失当前客户端投影时的有界冷缓存
-回填。补丁持有相关运行源码、测试、包 README 和 Agent Note；共享生成物由安装脚本从
-全部当前源贡献重新生成。不要只在 Harness 工作树里修改而不重新生成本文件。
+ui-workspace 的 preset 分组席位、官方 Session 行右侧元数据块的工作区／相对时间顺序与
+收缩规则，以及历史 Session 缺失当前客户端投影时的有界冷缓存回填。补丁持有相关运行
+源码、测试、包 README 和 Agent Note；共享生成物由安装脚本从全部当前源贡献重新生成。
+不要只在 Harness 工作树里修改而不重新生成本文件。
 
 校验当前 checkout 是否尚未应用：
 

@@ -4,7 +4,7 @@
  * 两条产物线（模式照抄 dsh-super-injector，同一套官方装配通道）：
  *  - hostBundle：src/index.ts → lib/index.js（ESM，node 半身自包含；identity apply）
  *  - clientBundle：src/client/index.ts → lib/client.js（CJS + __ModuleLoader__ banner，
- *    浏览器半身走官方模块表：react/ui-slots/ui-primitives/runtime 保持 external）
+ *    浏览器半身走官方模块表：Cordis/client-store/ui-slots/ui-primitives 保持 external）
  *
  * CSS 不经过任何编译管线：样式是 src/client/styles.ts 里的字符串常量，
  * 在模块首次执行时注入一个 <style data-plugin="dsh-preset-manager"> 标签
@@ -22,9 +22,9 @@ const CLIENT_EXTERNALS = [
   'react-dom',
   'react-dom/client',
   '@deepseek-ai/cordis',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-runtime/client',
 ]
 
 const clientBundle: UserConfig = {

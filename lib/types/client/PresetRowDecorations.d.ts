@@ -1,5 +1,5 @@
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
-import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client';
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client';
 import type { PresetGroupNode } from './roster.ts';
 /** One workspace choice of the preset row's + picker. */
 export interface WorkspaceChoice {

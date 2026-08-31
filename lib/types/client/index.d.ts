@@ -1,4 +1,23 @@
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
+/**
+ * dsh-preset-manager browser half.
+ *
+ * Two registrations over one shared store (historical storage key
+ * `dsh.presetManager.v1`, explicit schema v2, one root
+ * instance):
+ * - `sidebar.workspaces.presetGroups` fills the patched ui-workspace child
+ *   slot (the whole preset-mode tree: visible groups in order, hidden groups
+ *   dimmed at the end, ungrouped bucket last);
+ * - `conversation.hero.agentPreset` shadows the official new-session chip at
+ *   priority -1 with the derived roster (visible presets only, display
+ *   overrides applied, opened on the starred default) — uninstalling the
+ *   plugin restores the official chip.
+ *
+ * The star (default) lives in the official `agent-presets.default` setting;
+ * `settings/document-updated` keeps both surfaces and the settings page in
+ * sync. Zero new RPCs: roster reads, settings writes, and the official
+ * stage→apply session flow are all existing verbs (DESIGN.md §5).
+ */
+import type { Context as ClientContext } from '@deepseek-ai/cordis';
 import { type PresetManagerKey } from './locales.ts';
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {

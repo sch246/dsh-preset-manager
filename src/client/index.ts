@@ -17,18 +17,24 @@
  * sync. Zero new RPCs: roster reads, settings writes, and the official
  * stage→apply session flow are all existing verbs (DESIGN.md §5).
  */
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 // Type-only: pulls ctx.remote and the forwarded-event key face into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls ctx.sessions into this program.
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { IApiClient } from '@deepseek-ai/dsh-host-apiproxy/client'
-import type { ClientContext, SessionId, SnapshotStore, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+// Type-only: pulls ctx.slots into this program.
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the patched ui-workspace SlotMap merge (the child slot).
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the hero seat).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { en, zh, type PresetManagerKey } from './locales.ts'
 import type { HostPreset, PresetManagerState, RosterSnapshot } from './roster.ts'
 import { planHide, planUnhide, shouldUnsetDefault } from './roster.ts'
@@ -55,22 +61,27 @@ function messageOf(error: unknown): string {
 }
 
 /** Persist one preset as the deployment default (the official star write). */
-async function writeDefaultPreset(api: Pick<IApiClient, 'settings'>, id: string): Promise<string | undefined> {
+async function writeDefaultPreset(remote: Pick<ClientRemote, 'settings'>, id: string): Promise<string | undefined> {
   try {
-    const response = await api.settings.update({ ns: AGENT_PRESET_SETTINGS_NS, patch: { default: id } })
-    return response.result.ok ? undefined : response.result.error.message
+    const response = await remote.settings.update(
+      AGENT_PRESET_SETTINGS_NS,
+      { default: id },
+      undefined,
+    )
+    return response.ok ? undefined : response.error.message
   } catch (error) {
     return messageOf(error)
   }
 }
 
 /** I3: unset the official default so new sessions fall back to the deployment default. */
-async function unsetDefaultPreset(api: Pick<IApiClient, 'settings'>): Promise<void> {
+async function unsetDefaultPreset(remote: Pick<ClientRemote, 'settings'>): Promise<void> {
   try {
-    await api.settings.mutate({
-      ns: AGENT_PRESET_SETTINGS_NS,
-      ops: [{ op: 'unset', path: ['default'] }],
-    })
+    await remote.settings.mutate(
+      AGENT_PRESET_SETTINGS_NS,
+      [{ op: 'unset', path: ['default'] }],
+      undefined,
+    )
   } catch (error) {
     console.warn('preset default unset failed:', error)
   }
@@ -90,7 +101,7 @@ class RosterController {
     presets: [],
   })
 
-  constructor(private readonly api: IApiClient) {}
+  constructor(private readonly remote: Pick<ClientRemote, 'agentPresets' | 'settings'>) {}
 
   private set(patch: Partial<RosterSnapshot>): void {
     this.store.set({ ...this.store.getSnapshot(), ...patch })
@@ -102,9 +113,9 @@ class RosterController {
     this.set({ status: 'loading', error: null })
     let presets: readonly HostPreset[]
     try {
-      const response = await this.api.agentPresets.list({})
-      if (!response.result.ok) throw new Error(response.result.error.message)
-      presets = response.result.value.presets
+      const response = await this.remote.agentPresets.list()
+      if (!response.ok) throw new Error(response.error.message)
+      presets = response.value.presets
     } catch (error) {
       this.set({ status: 'error', error: messageOf(error), presets: [] })
       return
@@ -121,7 +132,7 @@ class RosterController {
     const { presets } = this.store.getSnapshot()
     if (!presets.some(preset => preset.id === id)) return 'action.failed'
     if ((state.hidden ?? []).includes(id)) actions.setHidden(planUnhide(state.hidden, id))
-    const failure = await writeDefaultPreset(this.api, id)
+    const failure = await writeDefaultPreset(this.remote, id)
     if (failure !== undefined) return 'action.failed'
     await this.load(actions)
     return undefined
@@ -133,7 +144,7 @@ class RosterController {
     const plan = planHide(presets, state.hidden ?? [], id)
     if (!plan.ok) return 'hide.rejected'
     actions.setHidden(plan.hidden)
-    if (shouldUnsetDefault(presets, state.order, plan.hidden)) await unsetDefaultPreset(this.api)
+    if (shouldUnsetDefault(presets, state.order, plan.hidden)) await unsetDefaultPreset(this.remote)
     return undefined
   }
 
@@ -152,7 +163,7 @@ class RosterController {
 interface SeatSessionSummary {
   id: SessionId
   blank: boolean
-  agentPreset?: string
+  projectionValues?: SessionSummary['projectionValues']
 }
 
 /**
@@ -179,11 +190,9 @@ class SeatController {
   private pendingApply = false
 
   constructor(
-    private readonly api: Pick<IApiClient, 'agentPresets'>,
+    private readonly remote: Pick<ClientRemote, 'agentPresets'>,
     /** The session the hero is about to hand over to, when there is one. */
     private readonly currentSession: () => SeatSessionSummary | undefined,
-    /** Publish an applied switch into the session list. */
-    private readonly onApplied?: (sessionId: string, agentPreset: string) => void,
   ) {}
 
   private set(patch: Partial<SeatState>): void {
@@ -193,15 +202,15 @@ class SeatController {
   /** Read the roster and open the chip on the deployment default. */
   async load(): Promise<void> {
     try {
-      const response = await this.api.agentPresets.list({})
-      if (!response.result.ok) {
-        this.set({ error: response.result.error.message })
+      const response = await this.remote.agentPresets.list()
+      if (!response.ok) {
+        this.set({ error: response.error.message })
         return
       }
-      const { presets } = response.result.value
+      const { presets } = response.value
       this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
       this.set({
-        current: this.staged ?? this.currentSession()?.agentPreset ?? this.fallback,
+        current: this.staged ?? presetOf(this.currentSession()) ?? this.fallback,
         error: null,
       })
     } catch (error) {
@@ -244,21 +253,20 @@ class SeatController {
     // produce; the still-current started conversation must not consume it.
     if (this.pendingApply) {
       if (!session.blank) return
-    } else if (!session.blank || session.agentPreset === staged) {
+    } else if (!session.blank || presetOf(session) === staged) {
       this.staged = undefined
       return
     }
     this.set({ busy: true, error: null })
     try {
-      const response = await this.api.agentPresets.select({ sessionId: session.id, agentPreset: staged })
+      const response = await this.remote.agentPresets.select(session.id, staged)
       this.staged = undefined
       this.pendingApply = false
-      if (!response.result.ok) {
-        this.set({ busy: false, error: response.result.error.message, current: this.fallback })
+      if (!response.ok) {
+        this.set({ busy: false, error: response.error.message, current: this.fallback })
         return
       }
-      this.set({ busy: false, current: response.result.value.agentPreset })
-      this.onApplied?.(session.id as string, response.result.value.agentPreset)
+      this.set({ busy: false, current: response.value })
     } catch (error) {
       this.staged = undefined
       this.pendingApply = false
@@ -267,8 +275,16 @@ class SeatController {
   }
 }
 
+/** Current agent-preset projection carried by one Session list row. */
+function presetOf(session: SeatSessionSummary | undefined): string | undefined {
+  const value = session?.projectionValues?.agentPreset
+  return typeof value === 'string' ? value : undefined
+}
+
 /** Required services (cordis fiber inject); the inner scope adds conversation/sessions/workspaces. */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'sessions']
+export const inject = [
+  'slots', 'locale', 'remote', 'remote.agentPresets', 'remote.settings', 'sessions',
+]
 
 /**
  * Register the preset tree (once the patched slot is declared) and the
@@ -276,8 +292,7 @@ export const inject = ['slots', 'locale', 'connection', 'remote', 'sessions']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  const { api } = ctx.get('connection') as ConnectionHandle
-  const controller = new RosterController(api)
+  const controller = new RosterController(ctx.remote)
   // One shared handle → the framework resolves ONE root instance both
   // registrations read and write (the single list of the whole plugin).
   const presetStore = createPresetManagerStore()
@@ -332,10 +347,11 @@ export function apply(ctx: ClientContext): void {
 
   // The shadow chip: same conversation scope as the official chip, lower
   // priority (legal shadow; uninstalling restores the official entry).
-  ctx.inject(['slots', 'conversation', 'sessions', 'workspaces', 'connection', 'remote'], (scope: ClientContext) => {
-    const scopeApi = (scope.get('connection') as ConnectionHandle).api
+  ctx.inject([
+    'slots', 'conversation', 'sessions', 'uiWorkspace', 'remote', 'remote.agentPresets',
+  ], (scope: ClientContext) => {
     const seatCtl = new SeatController(
-      scopeApi,
+      scope.remote,
       (): SeatSessionSummary | undefined => {
         const state = scope.sessions.list.getSnapshot()
         const summary = state.current === undefined ? undefined : state.byId[state.current]
@@ -344,80 +360,22 @@ export function apply(ctx: ClientContext): void {
           : {
             id: summary.id,
             blank: summary.blank,
-            ...(summary.agentPreset === undefined ? {} : { agentPreset: summary.agentPreset }),
+            ...(summary.projectionValues === undefined
+              ? {}
+              : { projectionValues: summary.projectionValues }),
           }
-      },
-      (sessionId, agentPreset) => {
-        scope.sessions.noteAgentPreset(sessionId as never, agentPreset)
       },
     )
     seatRef = seatCtl
-    /** Wait until the sessions list mirror carries a freshly created session. */
-    const waitForListed = (sessionId: SessionId, timeoutMs = 3000): Promise<boolean> => {
-      const snapshot = scope.sessions.list.getSnapshot()
-      if (snapshot.byId[sessionId] !== undefined) return Promise.resolve(true)
-      return new Promise((resolve) => {
-        let settled = false
-        const timer = window.setTimeout(() => { finish(false) }, timeoutMs)
-        const stop = scope.sessions.list.subscribe(() => {
-          if (scope.sessions.list.getSnapshot().byId[sessionId] !== undefined) finish(true)
-        })
-        const finish = (ok: boolean): void => {
-          if (settled) return
-          settled = true
-          stop()
-          window.clearTimeout(timer)
-          resolve(ok)
-        }
-      })
-    }
     // The tree's + button: resolve the workspace (explicit pick → current →
-    // recent), then either reuse its provisional blank session (staged preset
-    // applies on the connect echo) or create the session WITH the chosen
-    // preset — the preset identity is available before the session opens.
-    // Ordinary presets land on the ready-to-start composer; warm-minimal stays
-    // blank until its first real user input reaches the inbox. No workspace at
-    // all → a hint, no action.
+    // recent) through the official Workspace navigation controller. The
+    // staged preset applies when that controller creates or reuses the blank
+    // Session and opens it. No workspace at all means no action.
     startSessionByPreset = async (id: string, workspaceId?: WorkspaceId): Promise<PresetManagerKey | undefined> => {
-      const workspaces = scope.workspaces.list.getSnapshot()
-      const sessions = scope.sessions.list.getSnapshot()
-      const currentWorkspaceId = sessions.current === undefined
-        ? undefined
-        : workspaces.items.find(workspace => workspace.sessionIds.includes(sessions.current as SessionId))?.workspaceId
-      const target = workspaceId ?? currentWorkspaceId ?? workspaces.recentWorkspaceId
-      if (target === undefined) return 'start.noWorkspace'
-      const workspace = workspaces.items.find(item => item.workspaceId === target)
-      // Reuse rule mirrors the official New Session flow: a blank member with
-      // the canonical cwd. Once warm-minimal seeds after the first real input,
-      // its turn/start flips blank off, so a started conversation is never
-      // reused as "new".
-      const reusable = workspace === undefined
-        ? undefined
-        : sessions.ids.find(id => {
-          const summary = sessions.byId[id]
-          return summary !== undefined && summary.blank
-            && summary.cwd === workspace.path
-            && workspace.sessionIds.includes(summary.id)
-            && !workspaces.archivedSessionIds.includes(summary.id)
-        })
-      if (reusable !== undefined) {
-        seatRef?.stageForNext(id)
-        scope.workspaces.startSession(target)
-        return undefined
-      }
-      try {
-        const response = await scopeApi.sessions.create({ workspaceId: target, agentPreset: id })
-        if (!response.result.ok) return 'action.failed'
-        const created = response.result.value.sessionId
-        if (!(await waitForListed(created))) return 'action.failed'
-        scope.sessions.open(created)
-        // The created session already carries the preset; the chip only
-        // needs to mirror it (no stage to apply).
-        void seatRef?.load()
-        return undefined
-      } catch (error) {
-        return 'action.failed'
-      }
+      if (workspaceId === undefined) return 'start.noWorkspace'
+      seatRef?.stageForNext(id)
+      scope.uiWorkspace.startSession(workspaceId)
+      return undefined
     }
 
     scope.effect(() => {
@@ -428,9 +386,6 @@ export function apply(ctx: ClientContext): void {
       const settingsMoved = scope.remote.$on('settings/document-updated', (ns) => {
         if (ns !== AGENT_PRESET_SETTINGS_NS) return
         void seatCtl.load()
-      })
-      const presetSelected = scope.remote.$on('agent-preset/selected', (sessionId, agentPreset) => {
-        scope.sessions.noteAgentPreset(sessionId as never, agentPreset)
       })
       const seatInjected = (actions: PresetManagerBakedActions): SeatChipInjected => {
         currentActions = actions
@@ -454,7 +409,6 @@ export function apply(ctx: ClientContext): void {
       return () => {
         stop()
         settingsMoved()
-        presetSelected()
         chip()
         if (seatRef === seatCtl) seatRef = undefined
       }

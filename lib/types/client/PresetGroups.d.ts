@@ -1,5 +1,7 @@
-import type { SessionId, SnapshotStore, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client';
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client';
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots';
+import type { SessionId } from '@deepseek-ai/dsh-session/types';
 import type { PresetManagerState, RosterSnapshot } from './roster.ts';
 import type { PresetManagerKey } from './locales.ts';
 import type { createPresetManagerStore } from './stores.ts';
@@ -38,4 +40,4 @@ export type PresetGroupsProps = PropsRuntime<'sidebar.workspaces.presetGroups'> 
  * @param props - composed slot props.
  * @returns the tree element.
  */
-export declare function PresetGroups({ query, rows, sessionActions, useSessions, useWorkspaces, useStore, actions, useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t, }: PresetGroupsProps): import("react").JSX.Element;
+export declare function PresetGroups({ query, rows, sessionActions, useSessions, useSessionPendingInteraction, useWorkspaces, useStore, actions, useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t, }: PresetGroupsProps): import("react").JSX.Element;

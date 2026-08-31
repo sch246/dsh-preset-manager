@@ -7,6 +7,8 @@
  * @module dsh-preset-manager
  */
 
+import type { Context } from '@deepseek-ai/cordis'
+
 /** Cordis 插件名，loader 诊断用。 */
 export const name = 'dsh-preset-manager'
 
@@ -15,6 +17,6 @@ export const name = 'dsh-preset-manager'
  * 未来宿主侧能力（如 preset.yml 元数据写入路由）挂在这里。
  * @param _ctx - Cordis 上下文（未使用）。
  */
-export function apply(_ctx: unknown): void {
+export function apply(_ctx: Context): void {
   // Browser-half only: everything lives in src/client/.
 }

@@ -7,9 +7,11 @@
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { SessionId, SnapshotStore, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { GroupNode } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PresetManagerState, PresetGroupNode, RosterEntry, RosterSnapshot } from './roster.ts'
 import type { PresetManagerKey } from './locales.ts'
 import { derivePresetGroups, deriveRoster } from './roster.ts'
@@ -84,12 +86,13 @@ function useNativeDragAcceptance(active: boolean): void {
  * @returns the tree element.
  */
 export function PresetGroups({
-  query, rows, sessionActions, useSessions, useWorkspaces, useStore, actions,
+  query, rows, sessionActions, useSessions, useSessionPendingInteraction, useWorkspaces, useStore, actions,
   useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t,
 }: PresetGroupsProps) {
   const list = useSessions(snapshot => snapshot)
   const workspaceItems = useWorkspaces(snapshot => snapshot.items)
   const archivedSessionIds = useWorkspaces(snapshot => snapshot.archivedSessionIds)
+  const pendingInteractions = useSessionPendingInteraction(snapshot => snapshot)
   const state = useStore(snapshot => snapshot)
   const rosterSnapshot = useRoster(snapshot => snapshot)
 
@@ -119,8 +122,8 @@ export function PresetGroups({
     [rosterSnapshot.presets, state],
   )
   const sessionNodes = useMemo(
-    () => rows.deriveSessions(list, archivedSessionIds),
-    [rows, list, archivedSessionIds],
+    () => rows.deriveSessions(list, archivedSessionIds, pendingInteractions),
+    [rows, list, archivedSessionIds, pendingInteractions],
   )
   const groups = useMemo(
     () => derivePresetGroups(list, sessionNodes, roster, state.order, query),

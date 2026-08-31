@@ -15,9 +15,7 @@
  * sequences visibility/settings writes and unit tests hold the
  * invariants' positive and negative cases.
  */
-import type {
-  SessionListState,
-} from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionNode } from '@deepseek-ai/dsh-client-ui-workspace/client'
 
 /** One Host roster entry exactly as `agentPreset.list` reports it. */
@@ -289,9 +287,10 @@ export function derivePresetGroups(
   for (const node of sessionNodes) {
     const summary = list.byId[node.id]
     if (summary === undefined) continue
-    const presetId = summary.agentPreset !== undefined
-      && roster.some(entry => entry.id === summary.agentPreset)
-      ? summary.agentPreset
+    const projectedPreset = summary.projectionValues?.agentPreset
+    const presetId = typeof projectedPreset === 'string'
+      && roster.some(entry => entry.id === projectedPreset)
+      ? projectedPreset
       : undefined
     const bucket = membersByPreset.get(presetId)
     if (bucket === undefined) membersByPreset.set(presetId, [node])

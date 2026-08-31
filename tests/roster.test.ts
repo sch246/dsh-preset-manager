@@ -5,7 +5,9 @@
  * positive and one negative example.
  */
 import { describe, expect, it } from 'vitest'
-import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  SessionListState, SessionSummary,
+} from '@deepseek-ai/dsh-api-session-controller/client'
 import {
   derivePresetGroups, deriveRoster, planHide, planUnhide, reconcile,
   PRESET_MANAGER_SCHEMA_VERSION, shouldUnsetDefault,
@@ -30,15 +32,17 @@ function state(
 /** Session factory with the optional fields folded through spreads. */
 function session(
   id: string,
-  extra: Partial<SessionSummary> & { id?: string },
+  extra: Partial<SessionSummary> & { id?: string; agentPreset?: string },
 ): SessionSummary {
+  const { agentPreset, ...summary } = extra
   return {
-    id: extra.id ?? id,
-    displayTitle: extra.displayTitle ?? id,
+    id: summary.id ?? id,
+    displayTitle: summary.displayTitle ?? id,
     running: false,
     blank: false,
     updatedAt: 0,
-    ...extra,
+    ...summary,
+    ...(agentPreset === undefined ? {} : { projectionValues: { agentPreset } }),
   }
 }
 
@@ -70,7 +74,6 @@ function nodes(state: SessionListState, excluded: readonly string[] = []): Prese
       id: summary.id,
       title: summary.displayTitle,
       blank: summary.blank,
-      ...(summary.pendingInteraction === undefined ? {} : { pendingInteraction: summary.pendingInteraction }),
       running: summary.running,
       runningSubagentCount: 0,
       completed: false,
@@ -282,9 +285,12 @@ describe('derivePresetGroups', () => {
   it('uses the official session projection for live interaction status', () => {
     const withPending = list([
       ...sessions,
-      session('s9', { agentPreset: 'p1', updatedAt: 90, running: true, pendingInteraction: 'question' }),
+      session('s9', { agentPreset: 'p1', updatedAt: 90, running: true }),
     ], 's2')
-    const p1 = derivePresetGroups(withPending, nodes(withPending), roster, ['p3', 'p1', 'p2'], '')
+    const officialNodes = nodes(withPending).map(node => node.id === 's9'
+      ? { ...node, pendingInteraction: 'question' as const }
+      : node)
+    const p1 = derivePresetGroups(withPending, officialNodes, roster, ['p3', 'p1', 'p2'], '')
       .find(group => group.key === 'p1')
     expect(p1?.sessions[0]).toMatchObject({
       id: 's9', running: true, runningSubagentCount: 0, pendingInteraction: 'question',

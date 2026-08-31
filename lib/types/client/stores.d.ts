@@ -5,8 +5,7 @@
  * (the preset tree and the shadow seat chip) receive the same handle, so the
  * framework resolves ONE root instance they share.
  */
-import { type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client';
-import type { BakedActions } from '@deepseek-ai/dsh-client-ui-slots';
+import { type BakedActions, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store';
 import type { PresetManagerState } from './roster.ts';
 /**
  * Annotation twin of the actions literal below (the export needs a declared

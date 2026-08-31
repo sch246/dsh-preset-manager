@@ -6,6 +6,7 @@
  * 扫描到本条目、把 lib/client.js 加进浏览器插件清单。
  * @module dsh-preset-manager
  */
+import type { Context } from '@deepseek-ai/cordis';
 /** Cordis 插件名，loader 诊断用。 */
 export declare const name = "dsh-preset-manager";
 /**
@@ -13,4 +14,4 @@ export declare const name = "dsh-preset-manager";
  * 未来宿主侧能力（如 preset.yml 元数据写入路由）挂在这里。
  * @param _ctx - Cordis 上下文（未使用）。
  */
-export declare function apply(_ctx: unknown): void;
+export declare function apply(_ctx: Context): void;

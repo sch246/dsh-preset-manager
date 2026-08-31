@@ -1,4 +1,4 @@
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots';
 import { type RosterSnapshot } from './roster.ts';
 import type { createPresetManagerStore } from './stores.ts';

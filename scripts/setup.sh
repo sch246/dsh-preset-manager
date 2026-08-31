@@ -42,7 +42,7 @@ PATCH_APPLIED_BY_SETUP=false
 verify_source_markers() {
   local needle='@meta-intent:begin dsh-preset-manager '
   local paths=(
-    packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
+    packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
     packages/client/ui-workspace/src/client/contract/slots.ts
     packages/client/ui-workspace/src/client/rows/Rows.tsx
   )
@@ -60,16 +60,16 @@ regenerate_shared_catalogs() {
 }
 
 echo "checking tracked harness patch against $CHECKOUT..."
-if git -C "$CHECKOUT" apply --check --reverse "$PATCH" 2>/dev/null; then
+if git -C "$CHECKOUT" apply --unidiff-zero --check --reverse "$PATCH" 2>/dev/null; then
   if [ "$RECORDED_SHA" = "$PATCH_SHA" ] && [ "$RECORDED_OWNED" = "true" ]; then
     PATCH_APPLIED_BY_SETUP=true
     echo "harness patch already applied by an earlier run of this exact setup"
   else
     echo "harness patch already present; preserving external ownership"
   fi
-elif git -C "$CHECKOUT" apply --check "$PATCH"; then
+elif git -C "$CHECKOUT" apply --unidiff-zero --check "$PATCH"; then
   echo "applying harness patch..."
-  git -C "$CHECKOUT" apply "$PATCH"
+  git -C "$CHECKOUT" apply --unidiff-zero "$PATCH"
   PATCH_APPLIED_BY_SETUP=true
 else
   echo "setup: neither the patch nor its exact reverse applies" >&2

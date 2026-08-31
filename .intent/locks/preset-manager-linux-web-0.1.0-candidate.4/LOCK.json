@@ -1,0 +1,168 @@
+{
+  "kind": "realization",
+  "id": "preset-manager-linux-web",
+  "revision": "0.1.0-candidate.4",
+  "status": "candidate",
+  "protocol": {
+    "id": "meta-intent",
+    "revision": "0.2"
+  },
+  "package": {
+    "id": "dsh-preset-manager",
+    "revision": "0.1.0-draft.20"
+  },
+  "state": {
+    "revision": "0.1.0-draft.20",
+    "entry": {
+      "path": "inputs/state/STATE.json",
+      "digest": "sha256:1195656d849934d8cc1681c48d7335a6ed91b741fcdc1bb31079b2de587f0bda"
+    },
+    "document": {
+      "path": "inputs/state/STATE.md",
+      "digest": "sha256:c5f852b0a8fc81a5c243be42823d66fd6ab08ad8a46dbe77ddf4e873968e4043"
+    }
+  },
+  "logs": [
+    {
+      "path": "../../logs/2026-08-26-source-and-verbatim-audit.md",
+      "digest": "sha256:b311fb8a61b60df75cfd38c06974790cd8a3f213277684908a3b2ce6aa6328f3"
+    },
+    {
+      "path": "../../logs/2026-08-26-reconstructed-product-intent.md",
+      "digest": "sha256:82b0c334ebe1edaeed5b31723c720437e941b17dac27a064f53a2be91c455f64"
+    },
+    {
+      "path": "../../logs/2026-08-26-reconstruction-verification.md",
+      "digest": "sha256:4b875ffc08fbacf2c68bcda633d929d968fdf16570e5883febc98f49067bc003"
+    },
+    {
+      "path": "../../logs/2026-08-26-user-original-intent.md",
+      "digest": "sha256:c9b9c0e39fb15b19e614b0af3c23a8b9a4b07224ad13fb4cd0a1f7d5cd2745e5"
+    },
+    {
+      "path": "../../logs/2026-08-26-description-and-create-flow-clarification.md",
+      "digest": "sha256:8fe2e0a8f7a3dbcfdd45791d883fa56028a2861124c71ec1ba6a54685bd4cf02"
+    },
+    {
+      "path": "../../logs/2026-08-26-session-actions-repair-and-adapter-direction.md",
+      "digest": "sha256:96e0aa49dfac0bf6e9a2199c27597866be0aeebe81d29c987d6c436ea1e8bd27"
+    },
+    {
+      "path": "../../logs/2026-08-26-dsh-std-non-adoption.md",
+      "digest": "sha256:a6c077124a132459dd3682ffe8d0032bd71a21cb2ce46c8df9825d5450bf5d92"
+    },
+    {
+      "path": "../../logs/2026-08-26-preexisting-patch-ownership-repair.md",
+      "digest": "sha256:604ff96400e4a29a0545c1609dea42161defe0fa7f436cbc7f3c949890231854"
+    },
+    {
+      "path": "../../logs/2026-08-26-source-region-ownership-practice.md",
+      "digest": "sha256:039a4c2e631e0e5372ac72aa3f56fed6f2f919ccd0d60ae652bfa9c0ba308634"
+    },
+    {
+      "path": "../../logs/2026-08-26-marker-locator-simplification.md",
+      "digest": "sha256:83d2d42ab6ddc5c510bd30d431de4f9c801293039e763a4720b622d7b8541145"
+    },
+    {
+      "path": "../../logs/2026-08-26-purpose-comment-marker-correction.md",
+      "digest": "sha256:a7c26c82da20f9d80d2b475bc52c328408132f140913cdc48a64562137992fce"
+    },
+    {
+      "path": "../../logs/2026-08-26-remote-baseline-correction.md",
+      "digest": "sha256:1c81d9f864a374a534c6e6874adda512b3c2f3135cc6e8c82a0bd1f1b21c842a"
+    },
+    {
+      "path": "../../logs/2026-08-31-default-entry-and-sidebar-simplification.md",
+      "digest": "sha256:ab524da673485ba31cc4f1aa23670b712fc846dbc0dbad4249e44291ab044863"
+    },
+    {
+      "path": "../../logs/2026-08-31-preset-start-open-order-mismatch.md",
+      "digest": "sha256:b56de4033e44255d42c61847c47c424cb57a6cb9137476aeefe7f38ae01a0f25"
+    },
+    {
+      "path": "../../logs/2026-08-31-historical-preset-projection-cache-mismatch.md",
+      "digest": "sha256:56744d291cd18ab836a950d890a62b6d6d3d68999caed74e7d612a037b8f7a34"
+    },
+    {
+      "path": "../../logs/2026-08-31-preset-start-handler-scope-mismatch.md",
+      "digest": "sha256:1108e42af35873aa4abb5957aac9f07e72806b10d901db4c8d3eb477ca099849"
+    },
+    {
+      "path": "../../logs/2026-08-31-cold-preset-selection-lookup-mismatch.md",
+      "digest": "sha256:818b2eb5f70c6a43002bf1e56acca9bb9d4ccb9505ba8eabf5ae0675957549fd"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "artifacts/acceptance.md",
+      "digest": "sha256:b440b81e367704be3d00c6e16bc78a43809a68f1beee60573e2d5d70182e95f1"
+    },
+    {
+      "path": "artifacts/install.md",
+      "digest": "sha256:2a4ba63e92a1021addaf2bf5c42c811db07aa2a30f0bec98de1179023710cc71"
+    }
+  ],
+  "target": {
+    "kind": "git",
+    "uri": "https://github.com/sch246/dsh-preset-manager.git",
+    "commit": "21c3ad6fc9cf11228a8630f4dab3fc51d33eb9b1",
+    "paths": [
+      "AGENTS.md",
+      "README.md",
+      "DESIGN.md",
+      "package.json",
+      "cordis.patch.yml",
+      "patches",
+      "scripts",
+      "src",
+      "tests",
+      "tsconfig.client.json",
+      "tsconfig.json",
+      "tsdown.config.ts",
+      "vitest.config.ts"
+    ]
+  },
+  "acceptance": {
+    "status": "incomplete",
+    "evidence": [
+      {
+        "id": "official-remote-host-base",
+        "observedOn": "2026-08-31",
+        "artifact": "artifacts/acceptance.md",
+        "result": "the Host patch applies and reverses on official origin/master cd5ef814"
+      },
+      {
+        "id": "source-validation",
+        "observedOn": "2026-08-31",
+        "artifact": "artifacts/acceptance.md",
+        "result": "focused plugin and Host checks pass for the committed realization"
+      },
+      {
+        "id": "root-workspace-preset-start",
+        "observedOn": "2026-08-31",
+        "artifact": "artifacts/acceptance.md",
+        "result": "a root-workspace start persists ptc on the actual Session before opening"
+      },
+      {
+        "id": "historical-preset-backfill",
+        "observedOn": "2026-08-31",
+        "artifact": "artifacts/acceptance.md",
+        "result": "the deployed migration populates seven historical preset groups with nonzero counts"
+      },
+      {
+        "id": "owned-deployment-receipt",
+        "observedOn": "2026-08-31",
+        "artifact": "artifacts/install.md",
+        "result": "the target receipt binds the exact patch digest, official base and owned regions"
+      }
+    ]
+  },
+  "authority": {
+    "decision": "pending-user-review"
+  },
+  "unresolved": [
+    "live session-row rename, fork and archive acceptance",
+    "live repeated-selection default write and failure presentation acceptance",
+    "owned uninstall and unrelated-drift preservation exercise"
+  ]
+}

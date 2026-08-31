@@ -249,19 +249,21 @@ export function PresetGroups({
                 onUnhide={() => { void unhide(state, group.presetId as string) }}
                 t={t}
               />,
-            drag: !canDrag
-              ? undefined
-              : {
-                start: () => {
-                  dropCommitted.current = false
-                  setDrag({ sourceId: group.key, over: null })
-                },
-                end: () => {
-                  if (drag !== null && drag.over !== null) commitDrag(drag, drag.over)
-                  else setDrag(null)
-                  dropCommitted.current = false
-                },
-              },
+            ...(canDrag
+              ? {
+                  drag: {
+                    start: () => {
+                      dropCommitted.current = false
+                      setDrag({ sourceId: group.key, over: null })
+                    },
+                    end: () => {
+                      if (drag !== null && drag.over !== null) commitDrag(drag, drag.over)
+                      else setDrag(null)
+                      dropCommitted.current = false
+                    },
+                  },
+                }
+              : {}),
             onToggle: () => {
               if (expanded) {
                 setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
@@ -295,18 +297,20 @@ export function PresetGroups({
           return (
             <Fragment key={group.key}>
               {rows.renderProjectGroup({
-                drag: !canDrag
-                  ? undefined
-                  : {
-                    active: drag !== null,
-                    marker,
-                    hover: (half) => {
-                      setDrag(active => active === null ? active : { ...active, over: { id: group.key, half } })
-                    },
-                    drop: (half) => {
-                      if (drag !== null) commitDrag(drag, { id: group.key, half })
-                    },
-                  },
+                ...(canDrag
+                  ? {
+                      drag: {
+                        active: drag !== null,
+                        marker,
+                        hover: (half) => {
+                          setDrag(active => active === null ? active : { ...active, over: { id: group.key, half } })
+                        },
+                        drop: (half) => {
+                          if (drag !== null) commitDrag(drag, { id: group.key, half })
+                        },
+                      },
+                    }
+                  : {}),
                 children: <>{projectRow}{sessionRows}{overflow}</>,
               })}
             </Fragment>

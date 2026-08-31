@@ -42,9 +42,13 @@ PATCH_APPLIED_BY_SETUP=false
 verify_source_markers() {
   local needle='@meta-intent:begin dsh-preset-manager '
   local paths=(
+    packages/client/ui-workspace/src/client/stores.ts
+    packages/client/ui-workspace/src/client/locales.ts
+    packages/client/ui-workspace/src/client/index.ts
     packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
     packages/client/ui-workspace/src/client/contract/slots.ts
     packages/client/ui-workspace/src/client/rows/Rows.tsx
+    packages/client/ui-workspace/src/client/rows/Rows.module.css
     packages/api/session-controller/src/list.ts
     packages/api/session-controller/src/agent.ts
     packages/api/session-controller/src/index.ts
@@ -94,13 +98,17 @@ regenerate_shared_catalogs
   echo "patch_applied_by_setup=$PATCH_APPLIED_BY_SETUP"
   echo "host_head=$(git -C "$CHECKOUT" rev-parse HEAD)"
   echo "marker_schema=meta-intent-source-region/0.1"
-  echo "regions=sidebar.workspaces.presetGroups,workspace.rows.alternateGrouping,workspace.groupBy.preset,session.list.incompleteProjectionProbe,sessionProjection.checkpointCompleteness,sessionProjectionCache.cachedCompleteness,session.agentPresetSelectionEndpoint,session.agentPresetSelectionActivation,session.agentPresetSelectionAssemblyImport,session.agentPresetSelectionAssemblyExport,session.agentPresetSelectionAssemblyMount,session.agentPresetSelectionAssemblyMethod,session.agentPresetSelectionRemote,session.agentPresetSelectionCatalogService,agentPresets.sessionAddressedSelection,agentPresets.preparedSelectionCatalogOwner"
+  echo "regions=sidebar.workspaces.presetGroups,workspace.rows.alternateGrouping,workspace.rows.projectExtension,workspace.rows.sessionMetadata,workspace.rows.presetOwner,workspace.groupBy.preset,session.list.backfillIncompleteProjections,sessionProjection.checkpointCompleteness,sessionProjectionCache.completeSnapshot,session.agentPresetSelection,session.agentPresetSelectionAssembly,session.agentPresetSelectionRemote,session.agentPresetSelectionCatalog,agentPresets.sessionAddressedSelection"
   echo "generators=pnpm run gen-client-catalog|pnpm run gen-cordis-api"
   echo "generated_catalogs=packages/extensions/cordis-client-runner/src/client/slot-catalog.ts,packages/extensions/tool-cordis/src/api-catalog.ts,docs/subsystems/session-projection.md,docs/subsystems/session-projection.zh.md,docs/subsystems/session-projection.i18n.yaml"
 } > "$STATE_FILE"
 
 echo "rebuilding changed Host, Remote client, and ui-workspace faces..."
-(cd "$CHECKOUT" && pnpm run build:lib:host && pnpm --filter @deepseek-ai/dsh-api-remotes bundle && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
+(cd "$CHECKOUT" \
+  && pnpm run build:lib:host \
+  && pnpm exec tsc -b packages/client/ui-workspace/tsconfig.json \
+  && pnpm --filter @deepseek-ai/dsh-api-remotes bundle \
+  && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
 
 echo "building dsh-preset-manager..."
 bash "$REPO_DIR/scripts/build.sh"

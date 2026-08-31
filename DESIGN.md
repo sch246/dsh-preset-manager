@@ -1,6 +1,6 @@
 # dsh-preset-manager 详细设计
 
-> 状态：v4，已实现。v4 保留补丁路线，并把冲突的“可见 order”拆为**完整顺序 + 独立 hidden + 显式用户默认**：隐藏不再破坏位置，默认预设永远可见。
+> 状态：v4，已在 DSH `0.1.2-alpha.2` 重合成。v4 保留补丁路线，并把冲突的“可见 order”拆为**完整顺序 + 独立 hidden + 显式用户默认**：隐藏不再破坏位置，默认预设永远可见。
 > 配套：`README.md`（产品说明）、`patches/`（harness 补丁）、`scripts/`（构建/安装）。
 
 ## 1. 目标与范围
@@ -51,13 +51,13 @@
 6. **`WorkspaceBrowser.tsx`**：
    - `ViewOptionsMenu` 菜单项加 `{ id: 'preset', label: t('groupBy.preset') }`；`groupBy`/`onGroupPick` 改收 `SessionGroupBy`；
    - 列表主体分支：`groupBy === 'preset'` 时优先渲染
-      `renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery, rows: presetRows })`
+      `renderSlot('sidebar.workspaces.presetGroups', { query: normalizedQuery, rows: presetRows })`
      （preset 模式下搜索态交给插件树做标题过滤，不再走全局内容搜索）；
    - 节标题：`'preset'` 时用 `t('section.presets')`。
-7. **历史 Session 投影回填**：session-projection 判断当前 client-visible checkpoint 是否完整；session-projection-cache 把完整性随缓存快照暴露；session-controller 在既有物理大小上限内重折叠不完整冷缓存并回写派生 checkpoint。相关包 README、测试、Agent Note 与 generator 链接映射同属静态补丁。
-8. **冷 Session 的目标 preset 激活**：`agentPresets/select` wire endpoint 保持 `(SessionId, presetId)`，由 Session Controller 接管原始 Session id。已有空白 Agent 走领域切换；冷空白 Session 直接在目标 preset 下恢复，并在完整 Agent 发布成功后追加选择事件。旧 preset 缺失不会抢先令目标选择失败；共享的无关恢复失败会按请求目标重试。Agent Presets 与 Session Controller 的 README、测试和 Agent Note 同属静态补丁。
+7. **历史 Session 投影回填**：session-projection 判断当前 client-visible checkpoint 是否完整；session-projection-cache 把完整性随缓存快照暴露；session-controller 在既有物理大小上限内重折叠不完整冷缓存并回写派生 checkpoint。相关包 README 与 generator 链接映射同属静态补丁。
+8. **冷 Session 的目标 preset 激活**：`agentPresets/select` wire endpoint 保持 `(SessionId, presetId)`，由 Session Controller 接管原始 Session id。已有空白 Agent 走领域切换；冷空白 Session 直接在目标 preset 下恢复，并在完整 Agent 发布成功后追加选择事件。旧 preset 缺失不会抢先令目标选择失败；同一 Session 的并发恢复复用 Session Controller 的 singleflight，无关恢复失败后按请求目标重试。Agent Presets 与 Session Controller 的 README 同属静态补丁。
 
-补丁**不**静态持有：共享 slot/API catalog、生成的 subsystem 文档和 Host `lib/`；setup/uninstall 从剩余源贡献重生成并重建。搜索栏本身、"添加工作区"按钮（preset 模式下保留，v1 可接受）、工作区/扁平两模式的任何逻辑也不改变。
+补丁**不**静态持有：共享 slot/API catalog、生成的 subsystem 文档和 Host `lib/`；setup/uninstall 从剩余源贡献重生成并重建。alpha.2 已原生提供 Session 行动作、flat 派生与 `composeAgent()`，补丁直接复用这些入口，不保留 alpha.1 的预备选择层。搜索栏本身、"添加工作区"按钮（preset 模式下保留，v1 可接受）、工作区/扁平两模式的任何逻辑也不改变。
 
 ### 3.2 插件注册（补丁之后的扩展点）
 
@@ -70,7 +70,7 @@ ctx.slots.inject('sidebar.workspaces.presetGroups', () => ctx.slots.register({
 ```
 
 `PresetGroups`（本插件的分组与装饰层）只依赖四个 props share：
-- `PropsRuntime<'sidebar.workspaces.presetGroups'>`：`useSessions` / `useWorkspaces`（root scope，会话数据现成）+ owner props `{ wide, query, rows }`；其中 `rows` 是官方行唯一呈现权威；
+- `PropsRuntime<'sidebar.workspaces.presetGroups'>`：`useSessions` / `useWorkspaces`（root scope，会话数据现成）+ owner props `{ query, rows }`；其中 `rows` 是官方行唯一呈现权威；
 - `PropsStore`：本插件 store（完整 `order` + `hidden` + overrides）；
 - inject face：侧栏树使用 `loadRoster()`、`open(id)`、`startSessionByPreset(id)` 等；hero 选择器独占 `setDefault(id)`。
 

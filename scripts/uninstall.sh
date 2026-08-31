@@ -48,7 +48,11 @@ elif git -C "$CHECKOUT" apply --unidiff-zero --check --reverse "$PATCH" 2>/dev/n
   regenerate_shared_catalogs
   rm -f "$STATE_FILE"
   echo "rebuilding changed Host, Remote client, and ui-workspace faces..."
-  (cd "$CHECKOUT" && pnpm run build:lib:host && pnpm --filter @deepseek-ai/dsh-api-remotes bundle && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
+  (cd "$CHECKOUT" \
+    && pnpm run build:lib:host \
+    && pnpm exec tsc -b packages/client/ui-workspace/tsconfig.json \
+    && pnpm --filter @deepseek-ai/dsh-api-remotes bundle \
+    && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
 else
   echo "uninstall: recorded patch no longer reverses cleanly; preserving Host files" >&2
   echo "uninstall: resolve overlapping edits before retrying" >&2

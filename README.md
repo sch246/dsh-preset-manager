@@ -25,11 +25,11 @@ npm install                        # devDeps：typescript / tsdown / @types/node
 bash scripts/setup.sh              # 见下：补丁 + 重建 + 注册 bundle
 ```
 
-`scripts/setup.sh` 依次做五件事（任一步失败即中止）：
+当前补丁以 DSH `0.1.2-alpha.2` 为目标。`scripts/setup.sh` 依次做五件事（任一步失败即中止）：
 
 1. 从本仓库受 Git 跟踪的 `patches/harness-groupby-preset.patch` 识别“尚未应用/已完整应用/冲突”三种状态；已应用可重复安装，冲突不改宿主；
 2. 应用（或复用）补丁，核对就近的 `@meta-intent` source-region owner 标记，随后从当前全部源贡献重生成共享 slot/API catalog；补丁本身不静态拥有生成文件；
-3. 记录补丁 SHA-256、owner region、生成物映射与本次 setup 的实际所有权，并运行 Host、api-remotes Client 与 ui-workspace bundle 构建；
+3. 记录补丁 SHA-256、owner region、生成物映射与本次 setup 的实际所有权，并生成 ui-workspace Client 声明、运行 Host、api-remotes Client 与 ui-workspace bundle 构建；
 4. 构建本插件（`scripts/build.sh`，自动探测 `DSH_CHECKOUT`）；
 5. `dsh plugin --profile web add .` 注册 bundle。
 

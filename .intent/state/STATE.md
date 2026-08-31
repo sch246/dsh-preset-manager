@@ -1,6 +1,6 @@
 # Preset manager intent
 
-Status: user-grounded intent with a candidate realization. Candidate.4 binds the committed plugin source, deployed Host patch and observed root-workspace and historical-session behavior while keeping implementation acceptance incomplete.
+Status: user-grounded intent awaiting a cold realization candidate against Harness alpha.2. Preserved locks are historical evidence, and implementation acceptance remains incomplete.
 
 ## Intent
 
@@ -82,8 +82,8 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 ## Resources and current reality
 
 - Repository: `https://github.com/sch246/dsh-preset-manager.git`.
-- Last committed local source baseline: `44c3a9eaecfe1c3fe4aaaf160436f8d673b7dca1`.
-- The source tree contains a substantial later v4 implementation across design, source, generated output, patching and lifecycle scripts. Until a realization lock binds a committed source identity, those bytes remain current reality rather than an immutable realization identity.
+- Current committed source: `816e418a7f317b5c315ec7a6a89106ed14ddc257`. It is an input to recomposition rather than an accepted realization identity.
+- No current candidate realizes this state on Harness alpha.2. The user selected a cold recomposition from the complete STATE against official alpha.2 target `0a53fb55bea101816fa226bb964ae2bed71c343b`, followed by feedback from the real installation.
 - At initial reconstruction, protocol 0.2 structural validation and both TypeScript no-emit checks passed. That mechanical observation did not include build, installation, browser or uninstall evidence.
 - The user subsequently tested the current creation flow and reported that it satisfies the observable requirement to reach the official creation interface with workspace and preset preselected.
 - The user selected the new-conversation selector as the sole preset-manager default-write entry and removed the sidebar star from the intended interaction. The selector distinguishes selection from default writes: a different option selects, the current non-default option sets the explicit user default on a repeated choice, and the current explicit default clears that setting on a repeated choice while preserving the pending selection. With no explicit user default, the recent Session preset then the managed-order first visible preset supply the fallback.
@@ -93,10 +93,8 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 - The session-action mismatch has a source-level repair: the owner contract requires rename, fork and archive callbacks and preset rows pass them to the official renderer. Earlier mechanical checks and a clean patch reversal do not replace live deployed menu confirmation, which remains outstanding.
 - The user clarified that the preset Session row's workspace label belongs before relative time inside one right-aligned metadata block. The Host patch gives the label the shrinkable, ellipsized position and keeps time non-shrinking; deployed ordinary-width, narrow-width and hover observation remains outstanding.
 - The user reported that set and clear default actions become especially slow while preset grouping is mounted. Inspection found a plugin-local realization mismatch: one successful settings write starts overlapping roster loads, publishes loading, reconciles unchanged local state and repeatedly derives the Session tree even though the returned settings view already contains the complete explicit-default change. The selected behavior keeps default projection updates separate from genuine roster lifecycle refreshes and requires no Host patch change.
-- The draft.22 source repair's Host patch has digest `sha256:0484bfaab562180c1d9fe12c709c21bb8ac4bb95dacb284ffec5dd6eacd0e45e` against official Harness base `cd5ef8148158c3a752a658978873241fdf8e2bbc`. It has no deployment receipt or realization lock; candidate.4 remains the historical deployed patch identity.
 - Local compatibility target: `/root/deepseek-harness`; this path is bootstrap evidence, not a portable package requirement.
-- Candidate.4 selects committed plugin source `21c3ad6fc9cf11228a8630f4dab3fc51d33eb9b1`, Host patch digest `sha256:c1c016096d03ad699831008a5472a69182765584efe6df7884a4820c8bac70a0`, and official Harness `origin/master` base `cd5ef8148158c3a752a658978873241fdf8e2bbc`. The dirty local assembly is deployment evidence only; it is not represented as a publishable Harness commit. The receipt records every owned source region and the generated catalogs rebuilt by setup and uninstall.
-- The last three candidates remain historical evidence for earlier compatibility regions and source identities. Setup and uninstall regenerate shared catalogs from the current source tree.
+- Candidate.4 binds draft.20, committed plugin source `21c3ad6fc9cf11228a8630f4dab3fc51d33eb9b1` and Harness alpha.1 base `cd5ef8148158c3a752a658978873241fdf8e2bbc`. Its receipt and all four preserved candidates remain historical evidence for earlier source and target identities; they are not current candidates or evidence of alpha.2 applicability or acceptance.
 
 ## Implementation hints
 
@@ -107,9 +105,10 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 
 ## Open tensions
 
-- Candidate.4 binds draft.20 to the committed source identity, exact Host patch, deployment receipt, validation commands, historical projection counts and a live root-workspace PTC start.
+- No current realization candidate binds draft.24 to alpha.2. Candidate.4 remains historical alpha.1 evidence and is not reusable as the current target realization.
+- Cold recomposition on alpha.2 still requires observation in the real Web UI with persistent settings; alpha.2 has not been accepted.
 - The user's postscript exposed a session-row overflow mismatch. A source repair exists, but PM-004 still needs a deployed interaction check before it is accepted.
 - The row metadata order and long-label truncation need deployed observation at ordinary and narrow sidebar widths; mechanical patch checks do not accept PM-001.
 - The exact UX for no-workspace creation failure, broken presets, large preset lists and error recovery is not explicit enough to treat as accepted.
 - The new-conversation default marker, repeat-selection action and visible write failure require deployed interaction evidence before they are accepted.
-- Runtime, current-source drift maintenance and owned uninstall evidence remain absent from this package.
+- Runtime compatibility on alpha.2, current-source drift maintenance and owned uninstall evidence remain absent from this package.

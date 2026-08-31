@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.23",
+  "revision": "0.1.0-draft.24",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -24,7 +24,8 @@
     "../logs/2026-08-31-preset-start-handler-scope-mismatch.md",
     "../logs/2026-08-31-cold-preset-selection-lookup-mismatch.md",
     "../logs/2026-08-31-session-row-metadata-order.md",
-    "../logs/2026-08-31-default-write-refresh-scope.md"
+    "../logs/2026-08-31-default-write-refresh-scope.md",
+    "../logs/2026-09-01-target-drift-and-recomposition.md"
   ],
   "protocol": {
     "id": "meta-intent",
@@ -39,19 +40,17 @@
       "id": "repository.dsh-preset-manager",
       "kind": "git-repository",
       "uri": "https://github.com/sch246/dsh-preset-manager.git",
-      "revision": "21c3ad6fc9cf11228a8630f4dab3fc51d33eb9b1",
-      "scope": "source identity selected by candidate.4"
+      "revision": "816e418a7f317b5c315ec7a6a89106ed14ddc257",
+      "scope": "current committed source selected as an input to cold recomposition; not an accepted realization"
     },
     {
       "id": "target.deepseek-harness",
       "kind": "git-checkout",
       "uri": "https://github.com/deepseek-ai/deepseek-harness.git",
-      "revision": "cd5ef8148158c3a752a658978873241fdf8e2bbc",
-      "scope": "official origin/master base for the candidate.4 Host patch; the deployed dirty assembly is evidence, not a repository identity"
+      "revision": "0a53fb55bea101816fa226bb964ae2bed71c343b",
+      "scope": "official dsh-v0.1.2-alpha.2 target selected for cold recomposition; no alpha.2 realization is accepted"
     }
   ],
   "activeLocks": [],
-  "candidateLocks": [
-    "../locks/preset-manager-linux-web-0.1.0-candidate.4/LOCK.json"
-  ]
+  "candidateLocks": []
 }

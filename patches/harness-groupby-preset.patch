@@ -756,13 +756,17 @@ index 0a11f037b6..4e619ec0e4 100644
 +  // @meta-intent:end dsh-preset-manager sessionProjection.checkpointCompleteness
 +
 diff --git a/scripts/gen-cordis-catalog.ts b/scripts/gen-cordis-catalog.ts
-index eaaccfcb20..e47e25f2cc 100644
+index eaaccfcb20..5b23256e9f 100644
 --- a/scripts/gen-cordis-catalog.ts
 +++ b/scripts/gen-cordis-catalog.ts
 @@ -98,0 +99,3 @@ export const SERVICE_PAGE: Record<string, string> = {
 +  // @meta-intent:begin dsh-preset-manager session.agentPresetSelectionCatalog
 +  sessionAgentPresets: 'session.md',
 +  // @meta-intent:end dsh-preset-manager session.agentPresetSelectionCatalog
+@@ -625,0 +629,3 @@ export const LINK_MAP: Record<string, string> = {
++  // @meta-intent:begin dsh-preset-manager sessionProjectionCache.completeSnapshotCatalog
++  CachedProjectionSnapshot: 'session-projection.md',
++  // @meta-intent:end dsh-preset-manager sessionProjectionCache.completeSnapshotCatalog
 diff --git a/packages/api/session-controller/src/preset-selection.ts b/packages/api/session-controller/src/preset-selection.ts
 new file mode 100644
 index 0000000000..1e23ab0a62

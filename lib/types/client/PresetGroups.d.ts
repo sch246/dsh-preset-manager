@@ -21,9 +21,7 @@ export interface PresetGroupsInjected {
      * no workspace can take the session or the create failed.
      */
     startSessionByPreset: (id: string, workspaceId?: WorkspaceId) => Promise<PresetManagerKey | undefined>;
-    /** Star a preset (unhiding it first when hidden), then write settings. */
-    setDefault: (state: PresetManagerState, id: string) => Promise<PresetManagerKey | undefined>;
-    /** Hide a preset (rejected for the starred one; I3 unset may follow). */
+    /** Hide a preset (rejected for the default one; I3 unset may follow). */
     hide: (state: PresetManagerState, id: string) => Promise<PresetManagerKey | undefined>;
     /** Unhide a preset: it reappends at the end of the list. */
     unhide: (state: PresetManagerState, id: string) => Promise<void>;
@@ -40,4 +38,4 @@ export type PresetGroupsProps = PropsRuntime<'sidebar.workspaces.presetGroups'> 
  * @param props - composed slot props.
  * @returns the tree element.
  */
-export declare function PresetGroups({ query, rows, sessionActions, useSessions, useSessionPendingInteraction, useWorkspaces, useStore, actions, useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t, }: PresetGroupsProps): import("react").JSX.Element;
+export declare function PresetGroups({ query, rows, sessionActions, useSessions, useSessionPendingInteraction, useWorkspaces, useStore, actions, useRoster, load, open, startSessionByPreset, hide, unhide, rename, t, }: PresetGroupsProps): import("react").JSX.Element;

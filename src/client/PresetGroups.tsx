@@ -2,7 +2,7 @@
  * The preset-group tree filling the patched `sidebar.workspaces.presetGroups`
  * child slot: visible preset groups in `order` order, hidden groups dimmed
  * and pinned at the end, and the ungrouped bucket last. Rows manage the
- * whole display layer (star / drag / hide / unhide / rename / new session)
+ * whole display layer (drag / hide / unhide / rename / new session)
  * through the injected face; all derivation stays in roster.ts.
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
@@ -16,7 +16,7 @@ import type { PresetManagerState, PresetGroupNode, RosterEntry, RosterSnapshot }
 import type { PresetManagerKey } from './locales.ts'
 import { derivePresetGroups, deriveRoster } from './roster.ts'
 import type { createPresetManagerStore } from './stores.ts'
-import { PresetRowActions, PresetRowMeta, PresetStar } from './PresetRowDecorations.tsx'
+import { PresetRowActions, PresetRowMeta } from './PresetRowDecorations.tsx'
 import { RenameDialog } from './RenameDialog.tsx'
 import { css } from './styles.ts'
 
@@ -39,9 +39,7 @@ export interface PresetGroupsInjected {
    * no workspace can take the session or the create failed.
    */
   startSessionByPreset: (id: string, workspaceId?: WorkspaceId) => Promise<PresetManagerKey | undefined>
-  /** Star a preset (unhiding it first when hidden), then write settings. */
-  setDefault: (state: PresetManagerState, id: string) => Promise<PresetManagerKey | undefined>
-  /** Hide a preset (rejected for the starred one; I3 unset may follow). */
+  /** Hide a preset (rejected for the default one; I3 unset may follow). */
   hide: (state: PresetManagerState, id: string) => Promise<PresetManagerKey | undefined>
   /** Unhide a preset: it reappends at the end of the list. */
   unhide: (state: PresetManagerState, id: string) => Promise<void>
@@ -87,7 +85,7 @@ function useNativeDragAcceptance(active: boolean): void {
  */
 export function PresetGroups({
   query, rows, sessionActions, useSessions, useSessionPendingInteraction, useWorkspaces, useStore, actions,
-  useRoster, load, open, startSessionByPreset, setDefault, hide, unhide, rename, t,
+  useRoster, load, open, startSessionByPreset, hide, unhide, rename, t,
 }: PresetGroupsProps) {
   const list = useSessions(snapshot => snapshot)
   const workspaceItems = useWorkspaces(snapshot => snapshot.items)
@@ -235,16 +233,6 @@ export function PresetGroups({
             group: row,
             label: group.presetId === undefined ? t('group.ungrouped') : group.label,
             muted: group.hidden,
-            leading: group.presetId === undefined
-              ? undefined
-              : <PresetStar
-                active={group.isDefault}
-                onSelect={() => {
-                  if (group.isDefault) return
-                  run(setDefault(state, group.presetId as string))
-                }}
-                t={t}
-              />,
             meta: group.presetId === undefined ? undefined : <PresetRowMeta group={group} t={t} />,
             rowActions: group.presetId === undefined
               ? undefined

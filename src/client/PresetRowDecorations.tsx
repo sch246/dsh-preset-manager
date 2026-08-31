@@ -13,25 +13,6 @@ export interface WorkspaceChoice {
   title: string
 }
 
-/** Star occupying the official project row's leading identity seat. */
-export function PresetStar({ active, onSelect, t }: {
-  active: boolean
-  onSelect: () => void
-  t: PropsLocale<'presetManager'>['t']
-}) {
-  return (
-    <button
-      type="button"
-      className={[css.star, active ? css.starActive : ''].join(' ').trim()}
-      aria-label={t('preset.default.aria')}
-      title={t('preset.default.aria')}
-      onClick={(event) => { event.stopPropagation(); onSelect() }}
-    >
-      {active ? '★' : '☆'}
-    </button>
-  )
-}
-
 /** Preset facts occupying the official project row's trailing metadata seat. */
 export function PresetRowMeta({ group, t }: {
   group: PresetGroupNode

@@ -22,15 +22,16 @@ The plugin should feel like a native extension of the existing workspace and new
 - All existing presets have one stable complete order.
 - Visibility is independent of order: hiding does not destroy position, and unhiding restores the preset to that position.
 - Hidden presets disappear from new-session choices and are shown grey at the end of the preset management list.
-- One star represents the host's current default preset. A default preset cannot remain hidden.
+- The new-conversation selector marks the Host's current default preset. A default preset cannot remain hidden.
 - Display-name and description overrides affect presentation without changing preset identity or source files.
 - The description editor accommodates long text through a multi-line control or automatic wrapping. If it accepts explicit line breaks, they remain intact in stored description data.
 - First installation, stored-schema migration, later host additions/removals and externally changed defaults reconcile without inventing a second order, visibility or default authority.
 
 ### P3. Provide direct, predictable actions
 
-- A user can reorder preset groups, change the default through a preset-row star, hide or unhide a preset, edit its display name and description, and start a session with that preset from the group surface.
-- The new-conversation selector uses the same visible ordering and display overrides.
+- A user can reorder preset groups, hide or unhide a preset, edit its display name and description, and start a session with that preset from the group surface. Preset-group rows do not contain a default control.
+- The new-conversation selector uses the same visible ordering and display overrides, marks the Host default, and is the only preset-manager UI that writes it. Choosing a different option changes only the pending session; choosing the current non-default option again sets it as default, while choosing the current default again performs no write.
+- Hover or keyboard focus exposes “设为默认” on the current non-default option, and a failed default write remains visible in the new-conversation surface.
 - Starting from a preset allows the user to choose a workspace, then enters the ordinary create-conversation interface with that workspace and preset already selected. Compatibility with the host creation flow is preferred over a parallel creation experience.
 
 ### P4. Preserve the host's presentation authority
@@ -50,7 +51,7 @@ The plugin should feel like a native extension of the existing workspace and new
 ## Observable acceptance
 
 - `PM-001`: In a running supported Harness profile, selecting “按预设” displays preset groups, workspace-labelled official session rows and an ungrouped fallback where applicable; existing non-preset grouping modes still work.
-- `PM-002`: Reorder, hide/unhide, default-star and display-rename operations survive reload according to P2; long descriptions wrap in the editor, accepted line breaks survive the data path, and an external official-default change is reflected without moving the preset or creating contradictory state.
+- `PM-002`: Reorder, hide/unhide and display-rename operations survive reload according to P2; the new-conversation selector marks the Host default and its repeat-selection default action survives reload; long descriptions wrap in the editor, accepted line breaks survive the data path, and an external official-default change is reflected without moving the preset or creating contradictory state.
 - `PM-003`: The preset `+` action allows workspace selection and reaches the ordinary create-conversation interface with workspace and preset preselected; hidden presets do not appear in the selector and visible presets follow the managed order.
 - `PM-004`: In preset mode, each session row still exposes and successfully performs the ordinary rename, fork and archive actions through its overflow surface.
 - `PM-005`: Pure tests cover first install, schema migration and both sides of the complete-order, default-visible and all-hidden invariants, plus grouping/search/order derivation.
@@ -82,6 +83,7 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 - The source tree contains a substantial later v4 implementation across design, source, generated output, patching and lifecycle scripts. Until a realization lock binds a committed source identity, those bytes remain current reality rather than an immutable realization identity.
 - At initial reconstruction, protocol 0.2 structural validation, both TypeScript no-emit checks and the then-current 26 Vitest cases passed. That observation did not include build, installation, browser or uninstall evidence.
 - The user subsequently tested the current creation flow and reported that it satisfies the observable requirement to reach the official creation interface with workspace and preset preselected.
+- The user selected the new-conversation selector as the sole preset-manager default-write entry and removed the sidebar star from the intended interaction. The selector distinguishes selection from default writes: a different option selects, the current non-default option sets the default on a repeated choice, and the current default is a no-op.
 - The session-action mismatch has a source-level repair: the owner contract now requires rename, fork and archive callbacks and preset rows pass them to the official renderer. The focused Harness suite passes 45 tests, preset-manager passes 27 tests, both typechecks and both builds pass, and the regenerated patch reverses cleanly. Live deployed menu confirmation remains outstanding.
 - Local compatibility target: `/root/deepseek-harness`; this path is bootstrap evidence, not a portable package requirement.
 - Candidate 1 practices compact package-delimited locators for the three compatibility regions and removes generated slot/API catalogs from exclusive patch ownership. Begin lines carry only ordinary `(purpose: ...)` commentary; its receipt carries realization and source-to-generated ownership evidence, while setup and uninstall regenerate the catalogs from the current source tree.
@@ -90,7 +92,7 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 ## Implementation hints
 
 - The current design uses a two-sided DSH bundle, `sidebar.workspaces.presetGroups`, a shadow registration for `conversation.hero.agentPreset`, official preset/settings/session APIs, and a bounded `ui-workspace` patch.
-- The complete `order` + independent `hidden` + host-authoritative default model is a strong current implementation because it makes the principal invariants explicit. Equivalent future realizations may differ if they continue to satisfy P1–P5.
+- The complete `order` + independent `hidden` + Host-authoritative default model is the selected state model. The new-conversation selector owns the default write; the sidebar has no parallel default control. Equivalent future realizations may differ if they continue to satisfy P1–P5.
 - Local persistence currently uses `dsh.presetManager.v1` with a versioned schema. This is a migration constraint for existing users, not necessarily the only future storage mechanism.
 
 ## Open tensions
@@ -98,4 +100,5 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 - Candidate 1 is being prepared for the current v4 implementation. Nearby attribution and generated-surface composition are recorded, but the realization is not accepted and its live lifecycle remains unexercised.
 - The user's postscript exposed a session-row overflow mismatch. Source and regression evidence now show it repaired, but PM-004 still needs a deployed interaction check before it is accepted.
 - The exact UX for no-workspace creation failure, broken presets, large preset lists and error recovery is not explicit enough to treat as accepted.
+- The new-conversation default marker, repeat-selection action and visible write failure require deployed interaction evidence before they are accepted.
 - Runtime, current-source drift maintenance and owned uninstall evidence remain absent from this package.

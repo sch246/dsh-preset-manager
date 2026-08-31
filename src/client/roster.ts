@@ -1,15 +1,15 @@
 /**
  * Pure derivation layer of dsh-preset-manager.
  *
- * Complete order + independent hidden ids + one star form the display model
+ * Complete order + independent hidden ids + one Host default form the display model
  * (DESIGN.md §4):
  * - `order` = every current preset in stable display order;
  * - `hidden` = visibility only (absent from the new-session selector,
  *   dimmed and pinned to the end of the group tree);
- * - the star = the Host's `agent-presets.default` (authoritative copy in
- *   official settings); the starred preset can never be hidden (I1);
+ * - the default = the Host's `agent-presets.default` (authoritative copy in
+ *   official settings); the default preset can never be hidden (I1);
  * - new presets append to the end of the list, deleted presets drop out (I2);
- * - no star + empty list ⇒ the Host default is unset (I3).
+ * - no default + empty list ⇒ the Host default is unset (I3).
  *
  * Every invariant is enforced here as a pure function so the controller only
  * sequences visibility/settings writes and unit tests hold the
@@ -43,8 +43,8 @@ export const PRESET_MANAGER_SCHEMA_VERSION = 2 as const
 
 /**
  * The plugin's display-layer state, persisted under `dsh.presetManager.v1`.
- * The star (default) is NOT stored here: the authoritative copy lives in the
- * official `agent-presets.default` setting; `roster.isDefault` is the star.
+ * The default is NOT stored here: the authoritative copy lives in the
+ * official `agent-presets.default` setting; `roster.isDefault` projects it.
  */
 export interface PresetManagerState {
   /** Explicit schema marker; do not infer install lifecycle from an empty order. */
@@ -80,7 +80,7 @@ export type ReconciledPresetManagerState = Pick<
 export interface RosterEntry {
   id: string
   trust: 'system' | 'user'
-  /** True while the roster marks this preset as the deployment default (the star). */
+  /** True while the roster marks this preset as the deployment default. */
   isDefault: boolean
   /** True when listed in `hidden`: absent from the selector, dimmed in the tree. */
   hidden: boolean
@@ -123,7 +123,7 @@ export function deriveRoster(
  * Reconcile the complete order and independent hidden set so I1 and I2 hold:
  * - ids that no longer exist drop out; duplicates collapse (I2, deletion);
  * - preset ids the roster gained append at the end in roster order (I2, new);
- * - the starred (default) preset is removed from hidden (I1);
+ * - the default preset is removed from hidden (I1);
  * - a fresh v2 installation starts with `initialized:false`: every existing
  *   Host preset is appended visible, regardless of how many already exist;
  * - an old v1 snapshot has neither schema nor hidden: ids outside its visible
@@ -183,7 +183,7 @@ export function reconcile(
 export type HidePlan = { ok: true; hidden: string[] } | { ok: false; reason: 'default' }
 
 /**
- * Plan a hide: I1 makes hiding the starred preset impossible, so the plan
+ * Plan a hide: I1 makes hiding the default preset impossible, so the plan
  * rejects it and the controller turns the rejection into a message instead
  * of touching visibility or settings.
  * @param presets - the current roster.
@@ -214,7 +214,7 @@ export function planUnhide(hidden: readonly string[], id: string): string[] {
 }
 
 /**
- * I3: when nothing is starred and the list has just become empty, the Host
+ * I3: when no preset is default and the list has just become empty, the Host
  * default must be unset so new sessions fall back to the deployment default.
  * @param presets - the current roster.
  * @param order - the complete current order.
@@ -249,8 +249,6 @@ export interface PresetGroupNode {
   description: string | undefined
   /** True for presets outside `order`: dimmed, not draggable, pinned at the end. */
   hidden: boolean
-  /** True while the preset is the deployment default (solid star). */
-  isDefault: boolean
   /** True when the preset cannot compose sessions (rows still listed). */
   broken: boolean
   /** Visible sessions in the group (after the query filter). */
@@ -303,7 +301,7 @@ export function derivePresetGroups(
 
   const rosterById = new Map(roster.map(entry => [entry.id, entry]))
   const groups: PresetGroupNode[] = []
-  const pushGroup = (entry: RosterEntry | undefined, key: string, hidden: boolean, isDefault: boolean): void => {
+  const pushGroup = (entry: RosterEntry | undefined, key: string, hidden: boolean): void => {
     const label = entry === undefined ? 'Ungrouped' : entry.displayName
     const bucketKey = key === UNGROUPED_PRESET_KEY ? undefined : key
     const members = membersByPreset.get(bucketKey) ?? []
@@ -316,7 +314,6 @@ export function derivePresetGroups(
       label,
       description: entry?.description,
       hidden,
-      isDefault,
       broken: entry?.broken === true,
       sessionCount: sessions.length,
       sessions,
@@ -325,18 +322,18 @@ export function derivePresetGroups(
   for (const id of order) {
     const entry = rosterById.get(id)
     if (entry === undefined || entry.hidden) continue
-    pushGroup(entry, id, false, entry.isDefault)
+    pushGroup(entry, id, false)
   }
   const ordered = new Set(order)
   for (const id of order) {
     const entry = rosterById.get(id)
     if (entry === undefined || !entry.hidden) continue
-    pushGroup(entry, entry.id, true, entry.isDefault)
+    pushGroup(entry, entry.id, true)
   }
   for (const entry of roster) {
     if (!entry.hidden || ordered.has(entry.id)) continue
-    pushGroup(entry, entry.id, true, entry.isDefault)
+    pushGroup(entry, entry.id, true)
   }
-  pushGroup(undefined, UNGROUPED_PRESET_KEY, false, false)
+  pushGroup(undefined, UNGROUPED_PRESET_KEY, false)
   return groups
 }

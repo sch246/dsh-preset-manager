@@ -120,7 +120,7 @@ describe('reconcile', () => {
     })
   })
 
-  it('I1 negative: a visible default keeps its position (star and order decouple)', () => {
+  it('I1 negative: a visible default keeps its position (default and order decouple)', () => {
     expect(reconcile([host('a', true), host('b')], state(['b', 'a']))).toMatchObject({
       order: ['b', 'a'], hidden: [],
     })
@@ -202,11 +202,11 @@ describe('reconcile', () => {
 })
 
 describe('planHide / planUnhide / shouldUnsetDefault', () => {
-  it('I1 negative: hiding the starred preset is rejected before any write', () => {
+  it('I1 negative: hiding the default preset is rejected before any write', () => {
     expect(planHide([host('a', true), host('b')], [], 'a')).toEqual({ ok: false, reason: 'default' })
   })
 
-  it('hiding a non-starred preset changes visibility without touching order', () => {
+  it('hiding a non-default preset changes visibility without touching order', () => {
     expect(planHide([host('a', true), host('b')], [], 'b')).toEqual({ ok: true, hidden: ['b'] })
   })
 
@@ -226,11 +226,11 @@ describe('planHide / planUnhide / shouldUnsetDefault', () => {
     expect(planUnhide(['c'], 'b')).toEqual(['c'])
   })
 
-  it('I3 positive: all hidden with no star requires unsetting the default', () => {
+  it('I3 positive: all hidden with no default requires unsetting the Host setting', () => {
     expect(shouldUnsetDefault([host('a'), host('b')], ['a', 'b'], ['a', 'b'])).toBe(true)
   })
 
-  it('I3 negative: a star anywhere (or one visible preset) needs no unset', () => {
+  it('I3 negative: a default anywhere (or one visible preset) needs no unset', () => {
     expect(shouldUnsetDefault([host('a', true), host('b')], ['a', 'b'], ['b'])).toBe(false)
     expect(shouldUnsetDefault([host('a'), host('b')], ['a', 'b'], ['b'])).toBe(false)
   })

@@ -9,10 +9,10 @@
  *   dimmed at the end, ungrouped bucket last);
  * - `conversation.hero.agentPreset` shadows the official new-session chip at
  *   priority -1 with the derived roster (visible presets only, display
- *   overrides applied, opened on the starred default) — uninstalling the
- *   plugin restores the official chip.
+ *   overrides applied, opened on the Host default, and owns the only default
+ *   write entry) — uninstalling the plugin restores the official chip.
  *
- * The star (default) lives in the official `agent-presets.default` setting;
+ * The default lives in the official `agent-presets.default` setting;
  * `settings/document-updated` keeps both surfaces and the settings page in
  * sync. Zero new RPCs: roster reads, settings writes, and the official
  * stage→apply session flow are all existing verbs (DESIGN.md §5).
@@ -60,7 +60,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Persist one preset as the deployment default (the official star write). */
+/** Persist one preset as the deployment default. */
 async function writeDefaultPreset(remote: Pick<ClientRemote, 'settings'>, id: string): Promise<string | undefined> {
   try {
     const response = await remote.settings.update(
@@ -127,18 +127,17 @@ class RosterController {
     this.set({ status: 'ready', error: null, presets })
   }
 
-  /** Star a preset: unhide it first when hidden (I1), then write settings. */
-  async setDefault(actions: PresetManagerBakedActions, state: PresetManagerState, id: string): Promise<PresetManagerKey | undefined> {
+  /** Set one visible hero-menu preset as the Host default, then re-read the roster. */
+  async setDefault(actions: PresetManagerBakedActions, id: string): Promise<PresetManagerKey | undefined> {
     const { presets } = this.store.getSnapshot()
     if (!presets.some(preset => preset.id === id)) return 'action.failed'
-    if ((state.hidden ?? []).includes(id)) actions.setHidden(planUnhide(state.hidden, id))
     const failure = await writeDefaultPreset(this.remote, id)
     if (failure !== undefined) return 'action.failed'
     await this.load(actions)
     return undefined
   }
 
-  /** Hide a preset; the starred one is rejected (I1), and I3 may unset the default. */
+  /** Hide a preset; the default one is rejected (I1), and I3 may unset the default. */
   async hide(actions: PresetManagerBakedActions, state: PresetManagerState, id: string): Promise<PresetManagerKey | undefined> {
     const { presets } = this.store.getSnapshot()
     const plan = planHide(presets, state.hidden ?? [], id)
@@ -326,7 +325,6 @@ export function apply(ctx: ClientContext): void {
       load: () => controller.load(actions),
       open: (sessionId) => { ctx.sessions.open(sessionId) },
       startSessionByPreset: (id, workspaceId) => startSessionByPreset(id, workspaceId),
-      setDefault: (state, id) => controller.setDefault(actions, state, id),
       hide: (state, id) => controller.hide(actions, state, id),
       unhide: (state, id) => controller.unhide(actions, state, id),
       rename: (id, override) => controller.rename(actions, id, override),
@@ -396,6 +394,7 @@ export function apply(ctx: ClientContext): void {
             await seatCtl.load()
           },
           select: (id: string) => seatCtl.select(id),
+          setDefault: (id) => controller.setDefault(actions, id),
         }
       }
       const chip = scope.slots.register({

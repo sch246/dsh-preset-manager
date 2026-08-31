@@ -1,6 +1,7 @@
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots';
 import { type RosterSnapshot } from './roster.ts';
+import type { PresetManagerKey } from './locales.ts';
 import type { createPresetManagerStore } from './stores.ts';
 /** Staging state of the seat controller (staged pick, apply status). */
 export interface SeatState {
@@ -22,6 +23,8 @@ export interface SeatChipInjected {
     load: () => Promise<void>;
     /** Stage one preset for the next session. */
     select: (id: string) => Promise<void>;
+    /** Persist the selected preset as the Host default. */
+    setDefault: (id: string) => Promise<PresetManagerKey | undefined>;
 }
 /** Full component props: hero seat + shared store + inject face + locale. */
 export type SeatChipProps = PropsRuntime<'conversation.hero.agentPreset'> & PropsStore<ReturnType<typeof createPresetManagerStore>> & InjectFace<SeatChipInjected> & PropsLocale<'presetManager'>;
@@ -30,4 +33,4 @@ export type SeatChipProps = PropsRuntime<'conversation.hero.agentPreset'> & Prop
  * @param props - composed slot props.
  * @returns the chip, or null when no selectable preset remains.
  */
-export declare function SeatChip({ useRoster, useStore, useSeat, load, select, t }: SeatChipProps): import("react").JSX.Element | null;
+export declare function SeatChip({ useRoster, useStore, useSeat, load, select, setDefault, t }: SeatChipProps): import("react").JSX.Element | null;

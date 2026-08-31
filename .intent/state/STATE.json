@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.15",
+  "revision": "0.1.0-draft.16",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -16,7 +16,8 @@
     "../logs/2026-08-26-source-region-ownership-practice.md",
     "../logs/2026-08-26-marker-locator-simplification.md",
     "../logs/2026-08-26-purpose-comment-marker-correction.md",
-    "../logs/2026-08-26-remote-baseline-correction.md"
+    "../logs/2026-08-26-remote-baseline-correction.md",
+    "../logs/2026-08-31-default-entry-and-sidebar-simplification.md"
   ],
   "protocol": {
     "id": "meta-intent",

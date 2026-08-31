@@ -20,7 +20,6 @@ export declare const zh: {
     'sessions.count.other': string;
     'preset.broken': string;
     'preset.hidden': string;
-    'preset.default.aria': string;
     'preset.actions.aria': string;
     'preset.start.aria': string;
     'menu.rename': string;
@@ -35,6 +34,8 @@ export declare const zh: {
     'field.description': string;
     'seat.hint': string;
     'seat.noDescription': string;
+    'seat.default': string;
+    'seat.setDefault': string;
     'time.now': string;
     'time.minutes': string;
     'time.hours': string;
@@ -61,7 +62,6 @@ export declare const en: {
     'sessions.count.other': string;
     'preset.broken': string;
     'preset.hidden': string;
-    'preset.default.aria': string;
     'preset.actions.aria': string;
     'preset.start.aria': string;
     'menu.rename': string;
@@ -76,6 +76,8 @@ export declare const en: {
     'field.description': string;
     'seat.hint': string;
     'seat.noDescription': string;
+    'seat.default': string;
+    'seat.setDefault': string;
     'time.now': string;
     'time.minutes': string;
     'time.hours': string;

@@ -1,7 +1,7 @@
 {
   "name": "dsh-preset-manager",
   "version": "0.1.0",
-  "description": "DSH 预设管理器：官方视图选项加“按预设”分组 + 预设显示层管理（完整顺序、独立隐藏集合与默认星标；重命名覆盖显示名与说明）",
+  "description": "DSH 预设管理器：官方视图选项加“按预设”分组 + 预设显示层管理（完整顺序、独立隐藏集合与开始聊天页默认入口；重命名覆盖显示名与说明）",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/types/index.d.ts",

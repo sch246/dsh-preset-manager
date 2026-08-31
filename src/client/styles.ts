@@ -18,12 +18,6 @@ const CSS = `
   font-size: 12px; line-height: 18px; border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px; color: var(--dsw-alias-state-warn-primary);
 }
-.pm-star {
-  border: none; background: transparent; padding: 0; width: 16px; height: 16px;
-  font-size: 13px; line-height: 16px; text-align: center;
-  color: var(--dsw-alias-label-quaternary); cursor: pointer;
-}
-.pm-star:hover, .pm-star-active { color: var(--dsw-alias-state-warn-primary); }
 .pm-meta-items { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .pm-badge {
   flex: none; padding: 0 6px; border-radius: 8px; font-size: 11px; line-height: 16px;
@@ -39,6 +33,7 @@ const CSS = `
 }
 .pm-icon-button:hover { color: var(--dsw-alias-label-primary); }
 .pm-icon-button:disabled { color: var(--dsw-alias-label-quaternary); cursor: default; }
+.pm-seat-root { display: inline-flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .pm-seat {
   display: inline-flex; align-items: center; gap: 4px; max-width: min(100%, 240px);
   min-height: 28px; padding: 0 8px; border: none; border-radius: 16px;
@@ -51,8 +46,20 @@ const CSS = `
 .pm-seat-icon, .pm-seat-chevron { flex: none; }
 .pm-seat-icon { color: var(--dsw-alias-label-primary); }
 .pm-seat-chevron { color: var(--dsw-alias-label-caption); }
+.pm-seat-notice {
+  margin-top: 2px; padding: 2px 8px; font-size: 11px; line-height: 16px;
+  color: var(--dsw-alias-state-error-primary);
+}
 .pm-menu-item { display: flex; flex-direction: column; gap: 2px; max-width: 280px; }
+.pm-menu-item-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pm-menu-item-name { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-primary); }
+.pm-menu-item-default, .pm-menu-item-default-action {
+  flex: none; font-size: 11px; line-height: 16px; color: var(--dsw-alias-state-business-primary);
+}
+.pm-menu-item-default-action { display: none; }
+.pm-menu-item-default-candidate:hover .pm-menu-item-default-action,
+button:hover .pm-menu-item-default-candidate .pm-menu-item-default-action,
+button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-action { display: inline; }
 .pm-menu-item-desc {
   font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-caption); white-space: normal;
 }
@@ -82,20 +89,24 @@ export const css = {
   empty: 'pm-empty',
   retry: 'pm-retry',
   notice: 'pm-notice',
-  star: 'pm-star',
-  starActive: 'pm-star-active',
   metaItems: 'pm-meta-items',
   badge: 'pm-badge',
   badgeBroken: 'pm-badge-broken',
   groupCount: 'pm-group-count',
   actionContents: 'pm-action-contents',
   iconButton: 'pm-icon-button',
+  seatRoot: 'pm-seat-root',
   seat: 'pm-seat',
   seatIcon: 'pm-seat-icon',
   seatChevron: 'pm-seat-chevron',
+  seatNotice: 'pm-seat-notice',
   menuItem: 'pm-menu-item',
+  menuItemHeading: 'pm-menu-item-heading',
   menuItemName: 'pm-menu-item-name',
   menuItemDesc: 'pm-menu-item-desc',
+  menuItemDefault: 'pm-menu-item-default',
+  menuItemDefaultAction: 'pm-menu-item-default-action',
+  menuItemDefaultCandidate: 'pm-menu-item-default-candidate',
   renameHint: 'pm-rename-hint',
   renameFields: 'pm-rename-fields',
   renameField: 'pm-rename-field',

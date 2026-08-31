@@ -6,12 +6,6 @@ export interface WorkspaceChoice {
     id: WorkspaceId;
     title: string;
 }
-/** Star occupying the official project row's leading identity seat. */
-export declare function PresetStar({ active, onSelect, t }: {
-    active: boolean;
-    onSelect: () => void;
-    t: PropsLocale<'presetManager'>['t'];
-}): import("react").JSX.Element;
 /** Preset facts occupying the official project row's trailing metadata seat. */
 export declare function PresetRowMeta({ group, t }: {
     group: PresetGroupNode;

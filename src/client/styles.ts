@@ -57,6 +57,9 @@ const CSS = `
   flex: none; font-size: 11px; line-height: 16px; color: var(--dsw-alias-state-business-primary);
 }
 .pm-menu-item-default-action { display: none; }
+.pm-menu-item-default-candidate:hover .pm-menu-item-default,
+button:hover .pm-menu-item-default-candidate .pm-menu-item-default,
+button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default { display: none; }
 .pm-menu-item-default-candidate:hover .pm-menu-item-default-action,
 button:hover .pm-menu-item-default-candidate .pm-menu-item-default-action,
 button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-action { display: inline; }

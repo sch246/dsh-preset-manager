@@ -9,12 +9,13 @@
  *   dimmed at the end, ungrouped bucket last);
  * - `conversation.hero.agentPreset` shadows the official new-session chip at
  *   priority -1 with the derived roster (visible presets only, display
- *   overrides applied, opened on the Host default, and owns the only default
- *   write entry) — uninstalling the plugin restores the official chip.
+ *   overrides applied, initialized from the explicit user default, and owns
+ *   the only default write entry) — uninstalling the plugin restores the official chip.
  *
- * The default lives in the official `agent-presets.default` setting;
- * `settings/document-updated` keeps both surfaces and the settings page in
- * sync. Zero new RPCs: roster reads, settings writes, and the official
+ * The default lives in the user layer of the official `agent-presets.default`
+ * setting. The ui-settings describe mirror keeps both surfaces and the
+ * settings page in sync without adding a second settings reader. Zero new
+ * RPCs: roster reads, settings writes, and the official
  * hero stage→apply and preset-group connect→select→open flows are all
  * existing verbs (DESIGN.md §5).
  */

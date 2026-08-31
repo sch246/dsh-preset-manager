@@ -1,6 +1,6 @@
 # dsh-preset-manager 详细设计
 
-> 状态：v4，已实现。v4 保留补丁路线，并把冲突的“可见 order”拆为**完整顺序 + 独立 hidden + Host 默认**：隐藏不再破坏位置，默认预设永远可见。
+> 状态：v4，已实现。v4 保留补丁路线，并把冲突的“可见 order”拆为**完整顺序 + 独立 hidden + 显式用户默认**：隐藏不再破坏位置，默认预设永远可见。
 > 配套：`README.md`（产品说明）、`patches/`（harness 补丁）、`scripts/`（构建/安装）。
 
 ## 1. 目标与范围
@@ -8,10 +8,10 @@
 以**独立仓库、外部插件**（+ 一个最小 harness 补丁）为 DeepSeek Harness Web GUI 提供：
 
 1. **按预设分组浏览会话**：官方"视图选项"菜单里出现第三项"按预设"，会话列表按 agent preset 分组（形式与"按工作区"一致）。
-2. **预设显示层管理**，由「完整顺序 + hidden 集合 + Host 默认」承载：
+2. **预设显示层管理**，由「完整顺序 + hidden 集合 + 显式用户默认」承载：
    - 列表顺序 = 预设显示顺序 = 新会话选择器的顺序；
    - **hidden 独立于顺序**（隐藏项不出现在新会话选择器；分组树中置灰并固定排在显示列表末尾；取消隐藏恢复原位置）；
-   - 新会话预设菜单标出默认预设；选择不同项只切换当前预设，再次选择当前非默认项才写官方 `agent-presets.default`；
+   - 新会话预设菜单标出显式用户默认；选择不同项只切换当前预设，再次选择当前非默认项写 `agent-presets.default`，再次选择当前显式默认项清除该字段并保留选择；
    - 拖拽组行改顺序；`⋯` 菜单：重命名（显示名+说明）/ 隐藏 / 取消隐藏；
    - 点击预设组行 **+** 以该预设开始新会话。
 3. **明确不做**：删除预设、删除会话。
@@ -95,9 +95,9 @@ ctx.inject(['slots', 'conversation', 'sessions', 'workspaces', 'connection'], (s
 })
 ```
 
-`SeatChip` 复刻官方 stage→apply 语义，名单换成派生名单：**过滤 hidden、按完整 order 的可见子序列、显示覆盖名**；初始选中 = Host 默认预设。菜单始终标记默认项；不同项选择走 `select`，当前非默认项重复选择走 `setDefault`，当前默认项重复选择不写。默认写入失败在 hero 旁显示可见提示。
+`SeatChip` 复刻官方 stage→apply 语义，名单换成派生名单：**过滤 hidden、按完整 order 的可见子序列、显示覆盖名**。初始选中依次取 settings user 层显式默认、当前或复用 Session 的最近预设、managed order 第一项可见健康预设；页面打开后的手动选择不被异步默认刷新覆盖。菜单标记显式默认项；不同项选择走 `select`，当前非默认项重复选择走 `setDefault`，当前显式默认项重复选择走 `unsetDefault` 并保留本次选择。设置或清除失败都在 hero 旁显示可见提示。
 
-## 4. 数据模型：完整顺序 + hidden + Host 默认（不变量驱动）
+## 4. 数据模型：完整顺序 + hidden + 显式用户默认（不变量驱动）
 
 ### 4.1 store（历史存储键 `dsh.presetManager.v1`，当前 schema v2）
 
@@ -124,11 +124,11 @@ Harness store 会用 localStorage JSON **整体替换** `init()` 结果，没有
 - 已部署的过渡模型：有 `hidden` 但无 schema，原样保留可见性并补 schema；
 - schema v2 且 initialized：以后 Host 新增的预设追加可见，删除项清理。
 
-默认**不存本地**：权威拷贝在官方 settings 的 `agent-presets.default`，roster 的 `isDefault` 是其 UI 投影。
+默认**不存本地**：权威拷贝是官方 settings layered describe view 中 `agent-presets` 命名空间的 `user.default`。Client roster controller 用它覆盖 `agentPresets.list()` 的 `isDefault` 再发布派生名单，因此部署 fallback 不会被呈现为用户默认。
 
 不变量（reconcile 强制成立）：
 
-- **I1 默认预设永远可见**：`settings.default ∉ hidden`。默认预设不可能被隐藏。
+- **I1 显式用户默认永远可见**：settings user 层 `default ∉ hidden`。显式默认预设不可能被隐藏。
 - **I2 完整顺序跟随 roster**：`order` 恰含全部现存预设；新预设追加且默认可见，删除项同时从 `order` 与 `hidden` 清理。
 - **I3 无默认且全部隐藏**：官方 default 被 **unset**（`settings.mutate`），新会话回落到部署默认。有默认时 I1 阻止它进入 hidden。
 
@@ -136,20 +136,21 @@ Harness store 会用 localStorage JSON **整体替换** `init()` 结果，没有
 
 1. 先按 schema/initialized 区分首次安装、旧快照和当前状态；首次安装导入全部现有预设为可见；
 2. `order := order ∩ 现存预设 id`；新 id 追加到末尾；`hidden` 同步清除不存在 id；
-3. 若 `roster.isDefault` 指向 hidden 预设：只从 `hidden` 移除，保留 `order` 位置；
-4. 若 default 已被删除且本插件曾写过它：roster 会回落（host 侧 remove 时自动清 default），reconcile 只需跟随 `isDefault`；
+3. 若 settings user 层 default 指向 hidden 预设：只从 `hidden` 移除，保留 `order` 位置；
+4. 若显式 default 指向的预设被删除：Host 清除该 user 字段，Client 投影不把部署 fallback 标为显式默认；
 5. 本插件写操作先改 `hidden`（必要时），再写 settings（`update default` / `mutate unset`）；事件回读后 I1–I3 已成立，幂等。
 
-### 4.3 派生（纯函数，单测目标）
+### 4.3 派生（纯函数，单一投影）
 
 ```ts
-deriveRoster(presets, state)            // → { id, displayName, description, isDefault, hidden, broken, trust }[]
+deriveRoster(presets, state)            // → 按 managed order 排列的 { id, displayName, description, isDefault, hidden, broken, trust }[]
 reconcile(presets, storedState)         // → 当前 schema（首次安装 + I1/I2 + 旧版迁移）
 planHide / planUnhide / shouldUnsetDefault   // 隐藏/取消隐藏/清空默认的纯决策
 derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组树
 ```
 
 - 显示名 = `overrides[id].name ?? preset.name ?? id`；
+- selector 与 sidebar 消费同一 managed order；尚未来得及 reconcile 的 Host 新增项按 Host 顺序尾随；
 - 组内会话按 `updatedAt` 倒序（v1 无组内拖拽）；
 - 组树布局：可见预设组按 `order` 的可见子序列 → 隐藏预设组（置灰、不可拖拽、固定排在所有可见组之后，内部仍按完整 `order`）→ “未分组”兜底组最后；
 - Session 可见性与状态直接消费 ui-workspace 的官方投影（非 subagent、未归档、blank 仅当前、运行子代理与待交互状态），本插件不重建 `deriveFlat`；
@@ -159,10 +160,10 @@ derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组
 
 | 动作 | RPC / 通道 | 说明 |
 |---|---|---|
-| 读名单 | `agentPresets.list()` | 分组树加载 / `connection/reset` / 本插件写后回读 |
+| 读名单与显式默认 | `agentPresets.list()` + `settingsScope.describe()` | 共享 settings mirror 完成 layered describe 后，读取 `user.default` 并覆盖 roster fallback 标记，再原子发布 |
 | 写默认 | `settings.update({ ns:'agent-presets', patch:{ default: id } })` | hero 菜单再次选择当前非默认项 |
-| 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | 仅 I3（无默认且全部隐藏） |
-| 默认被外部改 | `remote.$on('settings/document-updated', ns==='agent-presets')` → reconcile | 官方设置页与插件互相同步 |
+| 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | hero 菜单再次选择当前显式默认项；I3 也复用此写入 |
+| 默认被外部改 | `settingsScope.describe().subscribe()` → reconcile | ui-settings 持有唯一 describe reader；官方设置页与插件互相同步 |
 | 开新会话（+） | `uiWorkspace.connectWorkspace(target)` → `agentPresets.select(sessionId, presetId)` → `sessions.open(sessionId)` | connect 统一复用或创建空白会话；select 成功并记录预设后才打开，失败留在当前界面并显示提示；Host patch 保留 wire 方法并改为按原始 Session id 激活 |
 | 打开会话 | `ctx.sessions.open(id)` | 现有服务动词 |
 | 排序/隐藏/改名 | 无 RPC，落 §4.1 的本地 store | 显示层数据 |
@@ -186,13 +187,13 @@ src/client/
 └── SeatChip.tsx        # shadow 接管的新会话选择器与唯一默认写入口
 ```
 
-### 6.1 操作语义（单列表 + Host 默认）
+### 6.1 操作语义（单列表 + 显式用户默认）
 
 | 用户动作 | store 变化 | settings 同步 |
 |---|---|---|
 | hero 选择不同预设 | 无 | 只走当前会话的 `agentPreset.select`，不写默认 |
 | hero 再次选择当前非默认预设 | 无 | `default = 该预设` |
-| hero 再次选择当前默认预设 | 无 | 无（no-op） |
+| hero 再次选择当前显式默认预设 | 无；保留当前选择 | unset `default` |
 | 隐藏（非默认） | 加入 `hidden`，`order` 不变 | 无 |
 | 隐藏（默认预设） | **拒绝** + 提示“默认预设不能被隐藏，请先将另一个预设设为默认” | 无 |
 | 全部隐藏 | 仅无默认时可能；`order` 仍完整 | `mutate unset default` |
@@ -205,8 +206,8 @@ src/client/
 
 ## 7. 关键流程
 
-1. **启动/刷新**：load roster → 原子 reconcile 生命周期与 I1/I2 → 发布 ready → 分组树不显示默认控件，hero 菜单标记默认项。
-2. **默认切换**：hero 菜单再次选择当前非默认项 → 写 `settings.default` → 回读 roster → “默认”标记移动；写入失败显示提示。选择不同项只切换当前预设，当前默认项重复选择不写。
+1. **启动/刷新**：并行读取 roster 并等待共享 settings layered describe → 用 `user.default` 投影显式默认 → 原子 reconcile 生命周期与 I1/I2 → 发布 ready；选择器在显式默认、最近 Session、managed order 第一项之间完成初始选择，未就绪时不显示错误 fallback。
+2. **默认切换**：先判断点击项是否不同于当前项；不同项只切换当前预设。重复点击当前非默认项写 `settings.default`，重复点击当前显式默认项清除该字段并保持当前选择；写入失败显示提示，异步 mirror 刷新不覆盖页面内手动选择。
 3. **隐藏**：加入 `hidden`、不改 `order` → 组行**置灰并固定在显示列表末尾** → shadow chip 不再出现；切换视图或 reload 后保持，取消隐藏恢复原位置；默认预设的隐藏被拒绝。
 4. **以预设开始新会话**：见 §5（connect 解析或创建空白会话 → 在该 id 上 select → 成功后 open，落到准备开始界面；普通 hero 选择仍使用 stage→apply）。
 5. **重命名**：对话框写 `overrides`；不改 id、不写 `preset.yml`。
@@ -218,7 +219,7 @@ src/client/
 3. 顺序/隐藏只影响分组树 + shadow chip；官方设置页预设列表保持 host 顺序。
 4. 组内会话固定按最近更新排序（v1）。
 5. 无 workspace 时 + 无操作。
-6. 列表存于浏览器 localStorage（`dsh.presetManager.v1`，与 `dsh.workspace.view.v5` 同级先例），不跨浏览器共享；默认值本身在官方 settings 里（host 持久）。
+6. 列表存于浏览器 localStorage（`dsh.presetManager.v1`，与 `dsh.workspace.view.v5` 同级先例），不跨浏览器共享；显式用户默认在官方 settings 里（host 持久）。
 
 ## 9. 阶段与工作量（单人）
 
@@ -231,11 +232,11 @@ src/client/
 
 总计约 **4–5 个工作日**。
 
-## 10. 测试与验证
+## 10. 验证
 
-- 单测（vitest，纯函数）：`reconcile`（I1/I2/I3 全部场景：外部改默认、隐藏默认预设被拒、新建预设、删除预设、全隐藏）、`deriveRoster`、`derivePresetGroups`，以及 hero pick 分类与默认/动作投影。
-- 真机验证：补丁 apply → 重建 → 插件装配 → 手工过全部流程；重点验证 shadow chip 与官方设置的默认互同步。
-- 仓库门禁从简：`typecheck` + 单测 + `build`；harness 重量门禁不适用于外部仓库。
+- STATE 是行为权威；本插件不维护复制语义的测试矩阵或 test gate。
+- `typecheck` + `build` 只检查类型与产物；最终验收在补丁 apply、重建和插件装配后，使用真实 Web UI 与真实 settings 持久化直接按 STATE 检查选择器优先级、默认 set/unset、managed order、失败提示与官方设置互同步，并观察刷新与服务重启后的状态。
+- Harness 重量门禁不适用于外部仓库。
 
 ## 11. 仓库布局（含补丁）
 
@@ -249,8 +250,6 @@ dsh-preset-manager/
 │   └── uninstall.sh    # 回滚补丁 + 卸 bundle
 ├── src/index.ts        # 节点半身：identity apply（装配锚点）
 ├── src/client/         # 浏览器半身（§6）
-├── tests/              # 纯函数单测（reconcile / roster / grouping / planHide）
-├── vitest.config.ts    # node 环境单测配置
 ├── DESIGN.md / README.md / AGENTS.md
 └── lib/                # 构建产物，随源码提交
 ```

@@ -63,6 +63,7 @@ link_pkg @deepseek-ai/dsh-client-locale packages/client/locale
 link_pkg @deepseek-ai/dsh-client-ui-conversation packages/client/ui-conversation
 link_pkg @deepseek-ai/dsh-client-ui-renderer packages/client/ui-renderer
 link_pkg @deepseek-ai/dsh-client-ui-session packages/client/ui-session
+link_pkg @deepseek-ai/dsh-client-ui-settings packages/client/ui-settings
 link_pkg @deepseek-ai/dsh-client-ui-workspace packages/client/ui-workspace
 link_pkg @deepseek-ai/dsh-session packages/core/session
 link_pkg @types/node node_modules/@types/node
@@ -72,8 +73,6 @@ link_pkg react packages/client/ui-renderer/node_modules/react
 link_pkg react-dom packages/client/ui-renderer/node_modules/react-dom
 link_pkg @types/react packages/client/ui-renderer/node_modules/@types/react
 link_pkg @types/react-dom packages/client/ui-renderer/node_modules/@types/react-dom
-link_pkg vitest packages/test-support/client-runtime/node_modules/vitest
-
 echo "=== Compiling host half src → lib (tsc $("$TSC" --version)) ==="
 "$TSC" -p tsconfig.json
 

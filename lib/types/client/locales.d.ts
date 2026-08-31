@@ -36,6 +36,7 @@ export declare const zh: {
     'seat.noDescription': string;
     'seat.default': string;
     'seat.setDefault': string;
+    'seat.unsetDefault': string;
     'time.now': string;
     'time.minutes': string;
     'time.hours': string;
@@ -78,6 +79,7 @@ export declare const en: {
     'seat.noDescription': string;
     'seat.default': string;
     'seat.setDefault': string;
+    'seat.unsetDefault': string;
     'time.now': string;
     'time.minutes': string;
     'time.hours': string;

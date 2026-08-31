@@ -9,12 +9,13 @@
  *   dimmed at the end, ungrouped bucket last);
  * - `conversation.hero.agentPreset` shadows the official new-session chip at
  *   priority -1 with the derived roster (visible presets only, display
- *   overrides applied, opened on the Host default, and owns the only default
- *   write entry) — uninstalling the plugin restores the official chip.
+ *   overrides applied, initialized from the explicit user default, and owns
+ *   the only default write entry) — uninstalling the plugin restores the official chip.
  *
- * The default lives in the official `agent-presets.default` setting;
- * `settings/document-updated` keeps both surfaces and the settings page in
- * sync. Zero new RPCs: roster reads, settings writes, and the official
+ * The default lives in the user layer of the official `agent-presets.default`
+ * setting. The ui-settings describe mirror keeps both surfaces and the
+ * settings page in sync without adding a second settings reader. Zero new
+ * RPCs: roster reads, settings writes, and the official
  * hero stage→apply and preset-group connect→select→open flows are all
  * existing verbs (DESIGN.md §5).
  */
@@ -23,6 +24,8 @@ import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+// Type-only: pulls ctx.settingsScope and the shared settings describe mirror.
+import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls ctx.remote and the forwarded-event key face into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls ctx.sessions into this program.
@@ -37,7 +40,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { en, zh, type PresetManagerKey } from './locales.ts'
-import type { HostPreset, PresetManagerState, RosterSnapshot } from './roster.ts'
+import type { HostPreset, PresetManagerState, ProjectedPreset, RosterEntry, RosterSnapshot } from './roster.ts'
 import { planHide, planUnhide, shouldUnsetDefault } from './roster.ts'
 import { PresetGroups, type PresetGroupsInjected } from './PresetGroups.tsx'
 import { SeatChip, type SeatChipInjected, type SeatState } from './SeatChip.tsx'
@@ -62,30 +65,63 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Persist one preset as the deployment default. */
-async function writeDefaultPreset(remote: Pick<ClientRemote, 'settings'>, id: string): Promise<string | undefined> {
+/** Read only the raw user layer; the resolved value may contain a deployment fallback. */
+function explicitUserDefault(settings: SettingsDescribeFace): string | undefined {
+  const snapshot = settings.getSnapshot()
+  if (snapshot.status === 'idle' || snapshot.status === 'loading') {
+    throw new Error('agent-preset settings are not ready')
+  }
+  const row = snapshot.view?.namespaces.find(candidate => candidate.ns === AGENT_PRESET_SETTINGS_NS)
+  const user = row?.user
+  if (typeof user !== 'object' || user === null || Array.isArray(user)) return undefined
+  const value = (user as Record<string, unknown>).default
+  return typeof value === 'string' ? value : undefined
+}
+
+/** Replace the Host fallback flag with the explicit user-default projection. */
+function projectExplicitDefault(
+  presets: readonly HostPreset[],
+  explicitDefaultId: string | undefined,
+): ProjectedPreset[] {
+  return presets.map(preset => ({ ...preset, isDefault: preset.id === explicitDefaultId }))
+}
+
+/** Persist one preset as the explicit user default. */
+async function writeDefaultPreset(
+  remote: Pick<ClientRemote, 'settings'>,
+  settings: SettingsDescribeFace,
+  id: string,
+): Promise<string | undefined> {
   try {
     const response = await remote.settings.update(
       AGENT_PRESET_SETTINGS_NS,
       { default: id },
       undefined,
     )
-    return response.ok ? undefined : response.error.message
+    if (!response.ok) return response.error.message
+    settings.acceptView(response.value)
+    return undefined
   } catch (error) {
     return messageOf(error)
   }
 }
 
-/** I3: unset the official default so new sessions fall back to the deployment default. */
-async function unsetDefaultPreset(remote: Pick<ClientRemote, 'settings'>): Promise<void> {
+/** Clear the user default so selection can fall back to the recent Session. */
+async function clearDefaultPreset(
+  remote: Pick<ClientRemote, 'settings'>,
+  settings: SettingsDescribeFace,
+): Promise<string | undefined> {
   try {
-    await remote.settings.mutate(
+    const response = await remote.settings.mutate(
       AGENT_PRESET_SETTINGS_NS,
       [{ op: 'unset', path: ['default'] }],
       undefined,
     )
+    if (!response.ok) return response.error.message
+    settings.acceptView(response.value)
+    return undefined
   } catch (error) {
-    console.warn('preset default unset failed:', error)
+    return messageOf(error)
   }
 }
 
@@ -103,25 +139,35 @@ class RosterController {
     presets: [],
   })
 
-  constructor(private readonly remote: Pick<ClientRemote, 'agentPresets' | 'settings'>) {}
+  private generation = 0
+
+  constructor(
+    private readonly remote: Pick<ClientRemote, 'agentPresets' | 'settings'>,
+    private readonly settings: SettingsDescribeFace,
+  ) {}
 
   private set(patch: Partial<RosterSnapshot>): void {
     this.store.set({ ...this.store.getSnapshot(), ...patch })
   }
 
-  /** Read the roster and reconcile the stored order (I1/I2). */
+  /** Read roster and explicit user default, then reconcile the stored order (I1/I2). */
   async load(actions?: PresetManagerBakedActions): Promise<void> {
-    if (this.store.getSnapshot().status === 'loading') return
+    const generation = ++this.generation
     this.set({ status: 'loading', error: null })
-    let presets: readonly HostPreset[]
+    let presets: readonly ProjectedPreset[]
     try {
-      const response = await this.remote.agentPresets.list()
+      const [response] = await Promise.all([
+        this.remote.agentPresets.list(),
+        this.settings.ensure(),
+      ])
       if (!response.ok) throw new Error(response.error.message)
-      presets = response.value.presets
+      presets = projectExplicitDefault(response.value.presets, explicitUserDefault(this.settings))
     } catch (error) {
+      if (generation !== this.generation) return
       this.set({ status: 'error', error: messageOf(error), presets: [] })
       return
     }
+    if (generation !== this.generation) return
     // Publish ready only after the store has atomically classified and folded
     // fresh / legacy / current state. This prevents a one-render visibility
     // flash while a whole-object legacy snapshot is still unreconciled.
@@ -129,11 +175,21 @@ class RosterController {
     this.set({ status: 'ready', error: null, presets })
   }
 
-  /** Set one visible hero-menu preset as the Host default, then re-read the roster. */
+  /** Set one visible hero-menu preset as the user default, then re-read the roster. */
   async setDefault(actions: PresetManagerBakedActions, id: string): Promise<PresetManagerKey | undefined> {
     const { presets } = this.store.getSnapshot()
     if (!presets.some(preset => preset.id === id)) return 'action.failed'
-    const failure = await writeDefaultPreset(this.remote, id)
+    const failure = await writeDefaultPreset(this.remote, this.settings, id)
+    if (failure !== undefined) return 'action.failed'
+    await this.load(actions)
+    return undefined
+  }
+
+  /** Clear the explicit user default without changing the selected preset. */
+  async unsetDefault(actions: PresetManagerBakedActions, id: string): Promise<PresetManagerKey | undefined> {
+    const { presets } = this.store.getSnapshot()
+    if (!presets.some(preset => preset.id === id && preset.isDefault)) return 'action.failed'
+    const failure = await clearDefaultPreset(this.remote, this.settings)
     if (failure !== undefined) return 'action.failed'
     await this.load(actions)
     return undefined
@@ -145,7 +201,10 @@ class RosterController {
     const plan = planHide(presets, state.hidden ?? [], id)
     if (!plan.ok) return 'hide.rejected'
     actions.setHidden(plan.hidden)
-    if (shouldUnsetDefault(presets, state.order, plan.hidden)) await unsetDefaultPreset(this.remote)
+    if (shouldUnsetDefault(presets, state.order, plan.hidden)) {
+      const failure = await clearDefaultPreset(this.remote, this.settings)
+      if (failure !== undefined) console.warn('preset default unset failed:', failure)
+    }
     return undefined
   }
 
@@ -178,10 +237,12 @@ class SeatController {
     busy: false,
   })
 
-  /** The deployment default, so a consumed stage falls back without re-reading. */
+  /** Current initial-priority result, used to recover a rejected selection. */
   private fallback = ''
-  /** Set while a pick is waiting for a session; cleared once applied. */
-  private staged: string | undefined
+  /** Manual choice retained for this mounted page across asynchronous refreshes. */
+  private manualSelection: string | undefined
+  /** Manual choice still waiting to be applied to a blank Session. */
+  private pendingApply: string | undefined
 
   constructor(
     private readonly remote: Pick<ClientRemote, 'agentPresets'>,
@@ -193,23 +254,25 @@ class SeatController {
     this.store.set({ ...this.store.getSnapshot(), ...patch })
   }
 
-  /** Read the roster and open the chip on the deployment default. */
-  async load(): Promise<void> {
-    try {
-      const response = await this.remote.agentPresets.list()
-      if (!response.ok) {
-        this.set({ error: response.error.message })
-        return
-      }
-      const { presets } = response.value
-      this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
-      this.set({
-        current: this.staged ?? presetOf(this.currentSession()) ?? this.fallback,
-        error: null,
-      })
-    } catch (error) {
-      this.set({ error: messageOf(error) })
+  /**
+   * Resolve initial selection from explicit user default → recent Session →
+   * first visible healthy managed entry. A later manual choice stays current.
+   */
+  sync(roster: readonly RosterEntry[]): void {
+    const available = roster.filter(entry => !entry.hidden && !entry.broken)
+    const availableIds = new Set(available.map(entry => entry.id))
+    if (this.manualSelection !== undefined && !availableIds.has(this.manualSelection)) {
+      this.manualSelection = undefined
+      this.pendingApply = undefined
     }
+    const explicitDefault = available.find(entry => entry.isDefault)?.id
+    const recent = presetOf(this.currentSession())
+    this.fallback = explicitDefault
+      ?? (recent !== undefined && availableIds.has(recent) ? recent : undefined)
+      ?? available[0]?.id
+      ?? ''
+    const current = this.manualSelection ?? this.fallback
+    if (this.store.getSnapshot().current !== current) this.set({ current })
   }
 
   /** Stage one preset for the next session, applying immediately when a blank session is current. */
@@ -221,36 +284,46 @@ class SeatController {
 
   /** Retain a hero pick until its blank Session becomes current. */
   private stage(id: string): void {
-    this.staged = id
+    this.manualSelection = id
+    this.pendingApply = id
     this.set({ current: id, error: null })
+  }
+
+  /** Keep a repeated current-row choice selected while its default write settles. */
+  retainSelection(id: string): void {
+    this.manualSelection = id
+    this.set({ current: id })
   }
 
   /** Adopt a successful preset-group selection without staging another apply. */
   acceptSelection(id: string): void {
-    this.staged = undefined
+    this.manualSelection = id
+    this.pendingApply = undefined
     this.set({ current: id, error: null, busy: false })
   }
 
   /** Hand the staged choice to the current session, if there is one to take it. */
   async apply(): Promise<void> {
-    const staged = this.staged
+    const staged = this.pendingApply
     const session = this.currentSession()
     if (staged === undefined || session === undefined) return
     if (!session.blank || presetOf(session) === staged) {
-      this.staged = undefined
+      this.pendingApply = undefined
       return
     }
     this.set({ busy: true, error: null })
     try {
       const response = await this.remote.agentPresets.select(session.id, staged)
-      this.staged = undefined
+      this.pendingApply = undefined
       if (!response.ok) {
+        this.manualSelection = undefined
         this.set({ busy: false, error: response.error.message, current: this.fallback })
         return
       }
       this.set({ busy: false, current: response.value })
     } catch (error) {
-      this.staged = undefined
+      this.manualSelection = undefined
+      this.pendingApply = undefined
       this.set({ busy: false, error: messageOf(error), current: this.fallback })
     }
   }
@@ -264,7 +337,7 @@ function presetOf(session: SeatSessionSummary | undefined): string | undefined {
 
 /** Required services (cordis fiber inject); the inner scope adds conversation/sessions/workspaces. */
 export const inject = [
-  'slots', 'locale', 'remote', 'remote.agentPresets', 'remote.settings', 'sessions', 'uiWorkspace',
+  'slots', 'locale', 'remote', 'remote.agentPresets', 'remote.settings', 'settingsScope', 'sessions', 'uiWorkspace',
 ]
 
 /**
@@ -273,7 +346,8 @@ export const inject = [
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  const controller = new RosterController(ctx.remote)
+  const settings = ctx.settingsScope.describe()
+  const controller = new RosterController(ctx.remote, settings)
   // One shared handle → the framework resolves ONE root instance both
   // registrations read and write (the single list of the whole plugin).
   const presetStore = createPresetManagerStore()
@@ -296,18 +370,12 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-preset-manager: dictionaries')
 
   ctx.effect(() => {
-    const refresh = (): void => {
-      void controller.load(currentActions)
-      void seatRef?.load()
-    }
-    const disposers = [
-      ctx.remote.$on('settings/document-updated', (ns) => {
-        if (ns !== AGENT_PRESET_SETTINGS_NS) return
-        refresh()
-      }),
-      ctx.on('connection/reset', () => { refresh() }),
-    ]
-    return () => { for (const dispose of disposers) dispose() }
+    return settings.subscribe(() => {
+      const snapshot = settings.getSnapshot()
+      if (snapshot.status === 'ready' || snapshot.status === 'unavailable') {
+        void controller.load(currentActions)
+      }
+    })
   }, 'dsh-preset-manager: roster refresh')
 
   const treeInjected = (actions: PresetManagerBakedActions): PresetGroupsInjected => {
@@ -361,20 +429,21 @@ export function apply(ctx: ClientContext): void {
       // A hero pick made without a current Session applies when a later
       // Workspace navigation makes a blank Session current.
       const stop = scope.sessions.list.subscribe(() => { void seatCtl.apply() })
-      const settingsMoved = scope.remote.$on('settings/document-updated', (ns) => {
-        if (ns !== AGENT_PRESET_SETTINGS_NS) return
-        void seatCtl.load()
-      })
       const seatInjected = (actions: PresetManagerBakedActions): SeatChipInjected => {
         currentActions = actions
         return {
           hooks: { seat: seatCtl.store, roster: controller.store },
-          load: async () => {
-            await controller.load(actions)
-            await seatCtl.load()
-          },
+          load: () => controller.load(actions),
+          sync: roster => { seatCtl.sync(roster) },
           select: (id: string) => seatCtl.select(id),
-          setDefault: (id) => controller.setDefault(actions, id),
+          setDefault: (id) => {
+            seatCtl.retainSelection(id)
+            return controller.setDefault(actions, id)
+          },
+          unsetDefault: (id) => {
+            seatCtl.retainSelection(id)
+            return controller.unsetDefault(actions, id)
+          },
         }
       }
       const chip = scope.slots.register({
@@ -387,7 +456,6 @@ export function apply(ctx: ClientContext): void {
       }, SeatChip)
       return () => {
         stop()
-        settingsMoved()
         chip()
         if (seatRef === seatCtl) seatRef = undefined
       }

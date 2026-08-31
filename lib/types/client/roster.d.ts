@@ -1,30 +1,36 @@
 /**
  * Pure derivation layer of dsh-preset-manager.
  *
- * Complete order + independent hidden ids + one Host default form the display model
+ * Complete order + independent hidden ids + one explicit user default form the display model
  * (DESIGN.md §4):
  * - `order` = every current preset in stable display order;
  * - `hidden` = visibility only (absent from the new-session selector,
  *   dimmed and pinned to the end of the group tree);
- * - the default = the Host's `agent-presets.default` (authoritative copy in
- *   official settings); the default preset can never be hidden (I1);
+ * - the default = the raw user-layer `agent-presets.default` field from
+ *   official settings; the controller removes the deployment fallback before
+ *   this module sees the roster, and the user default can never be hidden (I1);
  * - new presets append to the end of the list, deleted presets drop out (I2);
- * - no default + empty list ⇒ the Host default is unset (I3).
+ * - no explicit default + empty visible list ⇒ the user default is unset (I3).
  *
  * Every invariant is enforced here as a pure function so the controller only
- * sequences visibility/settings writes and unit tests hold the
- * invariants' positive and negative cases.
+ * sequences visibility and settings writes.
  */
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client';
 import type { SessionNode } from '@deepseek-ai/dsh-client-ui-workspace/client';
-/** One Host roster entry exactly as `agentPreset.list` reports it. */
+/** One raw Host roster entry exactly as `agentPreset.list` reports it. */
 export interface HostPreset {
     id: string;
     trust: 'system' | 'user';
+    /** Host deployment fallback; never consumed as an explicit user choice. */
     isDefault: boolean;
     name?: string;
     description?: string;
     broken?: string;
+}
+/** One roster entry after replacing the Host fallback with the explicit user default. */
+export interface ProjectedPreset extends Omit<HostPreset, 'isDefault'> {
+    /** Explicit user default from the official settings user layer. */
+    isDefault: boolean;
 }
 /**
  * The roster read snapshot the renderer subscribes to (controller-owned;
@@ -33,14 +39,15 @@ export interface HostPreset {
 export interface RosterSnapshot {
     status: 'idle' | 'loading' | 'ready' | 'error';
     error: string | null;
-    presets: readonly HostPreset[];
+    presets: readonly ProjectedPreset[];
 }
 /** Current on-disk schema written into the historical v1 localStorage key. */
 export declare const PRESET_MANAGER_SCHEMA_VERSION: 2;
 /**
  * The plugin's display-layer state, persisted under `dsh.presetManager.v1`.
  * The default is NOT stored here: the authoritative copy lives in the
- * official `agent-presets.default` setting; `roster.isDefault` projects it.
+ * raw user layer of the official `agent-presets.default` setting;
+ * `roster.isDefault` projects it.
  */
 export interface PresetManagerState {
     /** Explicit schema marker; do not infer install lifecycle from an empty order. */
@@ -73,7 +80,7 @@ export type ReconciledPresetManagerState = Pick<PresetManagerState, 'schemaVersi
 export interface RosterEntry {
     id: string;
     trust: 'system' | 'user';
-    /** True while the roster marks this preset as the deployment default. */
+    /** True while the official settings user layer names this preset as default. */
     isDefault: boolean;
     /** True when listed in `hidden`: absent from the selector, dimmed in the tree. */
     hidden: boolean;
@@ -85,12 +92,14 @@ export interface RosterEntry {
     description: string | undefined;
 }
 /**
- * Fold the Host roster with the plugin's display state.
- * @param presets - the Host roster as reported by `agentPreset.list`.
+ * Fold and order the Host roster with the plugin's display state. Presets in
+ * the complete managed order lead; Host additions not reconciled yet follow
+ * in Host order.
+ * @param presets - the Host roster with explicit-user-default flags projected.
  * @param state - the plugin store snapshot (`order` + `hidden` + `overrides`).
  * @returns one entry per preset, display facts resolved.
  */
-export declare function deriveRoster(presets: readonly HostPreset[], state: PresetManagerState): RosterEntry[];
+export declare function deriveRoster(presets: readonly ProjectedPreset[], state: PresetManagerState): RosterEntry[];
 /**
  * Reconcile the complete order and independent hidden set so I1 and I2 hold:
  * - ids that no longer exist drop out; duplicates collapse (I2, deletion);
@@ -141,8 +150,8 @@ export declare function planHide(presets: readonly {
  */
 export declare function planUnhide(hidden: readonly string[], id: string): string[];
 /**
- * I3: when no preset is default and the list has just become empty, the Host
- * default must be unset so new sessions fall back to the deployment default.
+ * I3: when no preset is an explicit user default and the list has just become
+ * empty, the user field must be unset so new sessions can use fallbacks.
  * @param presets - the current roster.
  * @param order - the complete current order.
  * @param nextHidden - hidden ids after the pending write.

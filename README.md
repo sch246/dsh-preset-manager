@@ -10,7 +10,7 @@
 - **默认从开始聊天页设置**：新会话预设菜单明确标记“默认”；切换到其他预设只影响当前新会话，再次选择当前非默认预设时显示并执行“设为默认”（写入官方 `agent-presets.default`，全局生效）；
 - **隐藏不改变顺序**：隐藏的预设不出现在新会话选择器，但在分组树末尾置灰保留入口；取消隐藏回到原顺序位置；
 - **重命名**：改显示名与说明（显示层覆盖，不动文件、不改 id）；
-- **+ 新会话**：悬停组行点 **+**，可选工作区；会话直接以所选预设创建（落在所选/当前/最近工作区），跳到准备开始的新会话界面。
+- **+ 新会话**：悬停组行点 **+**，选择工作区；会话直接以所选预设创建，跳到准备开始的新会话界面。
 
 > 详细设计（补丁落点、列表不变量、RPC 使用、已知限制）见 [DESIGN.md](DESIGN.md)。
 
@@ -25,11 +25,11 @@ npm install                        # devDeps：typescript / tsdown / @types/node
 bash scripts/setup.sh              # 见下：补丁 + 重建 + 注册 bundle
 ```
 
-`scripts/setup.sh` 依次做四件事（任一步失败即中止）：
+`scripts/setup.sh` 依次做五件事（任一步失败即中止）：
 
 1. 从本仓库受 Git 跟踪的 `patches/harness-groupby-preset.patch` 识别“尚未应用/已完整应用/冲突”三种状态；已应用可重复安装，冲突不改宿主；
 2. 应用（或复用）补丁，核对就近的 `@meta-intent` source-region owner 标记，随后从当前全部源贡献重生成共享 slot/API catalog；补丁本身不静态拥有生成文件；
-3. 记录补丁 SHA-256、owner region、生成物映射与本次 setup 的实际所有权，并重建被改包：`pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle`；
+3. 记录补丁 SHA-256、owner region、生成物映射与本次 setup 的实际所有权，并运行 Host、api-remotes Client 与 ui-workspace bundle 构建；
 4. 构建本插件（`scripts/build.sh`，自动探测 `DSH_CHECKOUT`）；
 5. `dsh plugin --profile web add .` 注册 bundle。
 
@@ -59,7 +59,7 @@ dsh-preset-manager/
 ├── package.json              # dsh.bundle.patch + dsh.client（platform web）
 ├── cordis.patch.yml          # bundle 身份行（lib/index.js 为空 apply）
 ├── patches/
-│   └── harness-groupby-preset.patch   # ui-workspace 补丁（§DESIGN 3.1）
+│   └── harness-groupby-preset.patch   # ui-workspace 席位、历史投影回填与冷 preset 选择（§DESIGN 3.1）
 ├── tsconfig.json / tsconfig.client.json / tsdown.config.ts / vitest.config.ts
 ├── scripts/
 │   ├── build.sh              # junction 链接 checkout 依赖 + tsc + tsdown
@@ -75,9 +75,11 @@ dsh-preset-manager/
 
 ## 工作原理
 
-- **补丁只加扩展点和官方行 owner 契约**：ui-workspace 增加 `'preset'` 分组模式与子槽 `sidebar.workspaces.presetGroups`，并向占用方提供官方 Session 投影和行渲染席位；插件只负责预设归组与显示管理，不复制官方行、状态点、折叠或拖拽实现。
+- **官方行仍由 Workspace 拥有**：ui-workspace 增加 `'preset'` 分组模式与子槽 `sidebar.workspaces.presetGroups`，并向占用方提供官方 Session 投影和行渲染席位；插件只负责预设归组与显示管理，不复制官方行、状态点、折叠或拖拽实现。
+- **历史分组按完整投影恢复**：列表识别缺少当前 client-visible 行的旧投影缓存，在配置的物理大小上限内从完整 Session 日志重折叠并回写派生缓存；部署迁移临时扩大该上限，完成后恢复默认值，权威会话日志不被改写。
+- **冷 Session 直接按目标 preset 激活**：Host 的 `agentPresets/select` 接受原始 Session id；已有空白 Agent 原地切换，冷空白 Session 在目标 preset 下恢复，完整发布成功后才记录选择。旧 preset 已删除或损坏不会阻止选择可用目标；目标无效、会话已开始或发布失败都不留下选择事件。
 - **完整顺序 + hidden + Host 默认的不变量**：`order` 保存全部预设的稳定顺序，`hidden` 独立保存隐藏集合，reconcile 强制 `settings.default ∉ hidden`——默认预设不可能被隐藏；无默认且全部隐藏时官方 default 被 unset。显式 schema/initialized 区分首次安装、旧 v1 和后续新增：首次安装即使 Host 已有很多预设也会全部导入为可见；旧 v1 的“可见 order”才把差集迁入 hidden；以后新增的预设追加可见。
-- **零新增 RPC**：默认走官方 `settings.update` / `settings.mutate`，名单读 `agentPreset.list`，新会话复用空白会话走 `workspaces.startSession` + `agentPreset.select`、新建走 `session.create({ workspaceId, agentPreset })`（创建即带预设，落到准备开始界面）；列表与名字覆盖是本插件本地数据（`dsh.presetManager.v1`）。
+- **复用官方 RPC**：默认走官方 `settings.update` / `settings.mutate`，名单读 `agentPresets.list`；预设组的新会话先用 `uiWorkspace.connectWorkspace` 解析或创建空白会话，再对该会话执行 `agentPresets.select(sessionId, presetId)`，成功后才由 `sessions.open` 打开。Host patch 只把既有 `select` endpoint 的身份解析移到 Session Controller，没有增加 wire 方法。列表与名字覆盖是本插件本地数据（`dsh.presetManager.v1`）。
 - **shadow 接管选择器**：以更低 priority 注册进 `conversation.hero.agentPreset`（single slot 的合法 shadow），卸载即恢复官方 chip。
 
 ## 已知限制

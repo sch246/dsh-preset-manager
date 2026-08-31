@@ -22,7 +22,7 @@
 |---|---|---|
 | 会话带 preset 信息 | `SessionSummary.agentPreset` 已在客户端列表里 | `client/runtime/.../sessions/service.ts` |
 | 预设名单 | `agentPreset.list` 现成（id/trust/isDefault/name/description/broken） | `host/apiproxy/src/api/agent-presets.ts` |
-| 开新会话指定预设 | `session.create({ agentPreset })` / `agentPreset.select` 现成 | `host/apiproxy/src/api/sessions.ts` |
+| 开新会话指定预设 | `uiWorkspace.connectWorkspace` / `agentPreset.select` / `sessions.open` 现成 | `ui-workspace/src/client/navigation.ts`、`ui-agent-preset/src/client/seat-store.ts` |
 | 写/清默认 | `settings.update` / `settings.mutate(op: unset)` 现成（官方同款路径） | `ui-agent-preset/.../settings-store.ts`、`rpc-map.ts` |
 | **新增 RPC** | 不可行：`RpcMethodMap` 编译期封闭 | `host/apiproxy/src/api/rpc-map.ts` |
 | 官方菜单加"按预设" | 需改 ui-workspace（`SessionGroupBy` 闭包 + 菜单项 + 树分支）——**本设计的补丁目标** | `client/ui-workspace/src/client/{stores,WorkspaceBrowser}.tsx` |
@@ -33,7 +33,7 @@
 
 ### 3.1 补丁内容（`patches/harness-groupby-preset.patch`）
 
-只动 `@deepseek-ai/dsh-client-ui-workspace` 一个包（git apply 风格 unified diff；具体文件数与行数随目标 harness 版本演进）：
+补丁持有三项 Host 兼容贡献（git apply 风格 unified diff；具体文件数与行数随目标 harness 版本演进）：
 
 1. **`stores.ts`**：`SessionGroupBy` 联合类型加 `'preset'`：
    ```ts
@@ -53,8 +53,10 @@
       `renderSlot('sidebar.workspaces.presetGroups', { wide, query: normalizedQuery, rows: presetRows })`
      （preset 模式下搜索态交给插件树做标题过滤，不再走全局内容搜索）；
    - 节标题：`'preset'` 时用 `t('section.presets')`。
+6. **历史 Session 投影回填**：session-projection 判断当前 client-visible checkpoint 是否完整；session-projection-cache 把完整性随缓存快照暴露；session-controller 在既有物理大小上限内重折叠不完整冷缓存并回写派生 checkpoint。相关包 README、测试、Agent Note 与 generator 链接映射同属静态补丁。
+7. **冷 Session 的目标 preset 激活**：`agentPresets/select` wire endpoint 保持 `(SessionId, presetId)`，由 Session Controller 接管原始 Session id。已有空白 Agent 走领域切换；冷空白 Session 直接在目标 preset 下恢复，并在完整 Agent 发布成功后追加选择事件。旧 preset 缺失不会抢先令目标选择失败；共享的无关恢复失败会按请求目标重试。Agent Presets 与 Session Controller 的 README、测试和 Agent Note 同属静态补丁。
 
-补丁**不**改：搜索栏本身、"添加工作区"按钮（preset 模式下保留，v1 可接受）、工作区/扁平两模式的任何逻辑。
+补丁**不**静态持有：共享 slot/API catalog、生成的 subsystem 文档和 Host `lib/`；setup/uninstall 从剩余源贡献重生成并重建。搜索栏本身、"添加工作区"按钮（preset 模式下保留，v1 可接受）、工作区/扁平两模式的任何逻辑也不改变。
 
 ### 3.2 插件注册（补丁之后的扩展点）
 
@@ -75,9 +77,9 @@ ctx.slots.inject('sidebar.workspaces.presetGroups', () => ctx.slots.register({
 
 ### 3.3 补丁的安装与回滚（`scripts/`）
 
-- `scripts/setup.sh`：识别补丁缺失、已完整存在或冲突；仅在自己实际 apply 时记录 Host 效果所有权，随后重建被改包、构建插件并 `dsh plugin add`。任一步失败即中止并提示。
+- `scripts/setup.sh`：识别补丁缺失、已完整存在或冲突；仅在自己实际 apply 时记录 Host 效果所有权，随后重建 Host、api-remotes Client、ui-workspace 与插件，并 `dsh plugin add`。任一步失败即中止并提示。
 - `scripts/uninstall.sh`：仅当记录表明补丁由 setup 实际应用、SHA 仍一致且 reverse check 通过时才回滚；预先存在或已漂移的 Host 效果保持不动，bundle 仍按正常流程移除。
-- 升级冲突：dsh 升级后补丁可能不适用；`--check` 先行检测，冲突时给出提示而不是硬打。补丁依赖 ui-workspace 的 preset 分组入口和 owner 行契约，升级时以当前 diff 与测试为准。
+- 升级冲突：dsh 升级后补丁可能不适用；`--check` 先行检测，冲突时给出提示而不是硬打。补丁依赖 ui-workspace 的 preset 分组入口和 owner 行契约、session projection/cache/list 的冷读接口，以及 Session Controller 的 Agent 激活事务，升级时以当前 diff 与测试为准。
 
 ### 3.4 新会话选择器接管（shadow，保留）
 
@@ -153,20 +155,19 @@ derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组
 - Session 可见性与状态直接消费 ui-workspace 的官方投影（非 subagent、未归档、blank 仅当前、运行子代理与待交互状态），本插件不重建 `deriveFlat`；
 - `query`（浏览器搜索态）在 preset 模式下交给组树做标题过滤：组标题或组内会话标题匹配则保留组，非空时组内会话行同步过滤。
 
-## 5. 使用的 RPC（全部现有，零新增）
+## 5. 使用的 RPC（复用现有 wire 方法）
 
 | 动作 | RPC / 通道 | 说明 |
 |---|---|---|
-| 读名单 | `agentPreset.list({})` | 分组树加载 / `connection/reset` / 本插件写后回读 |
+| 读名单 | `agentPresets.list()` | 分组树加载 / `connection/reset` / 本插件写后回读 |
 | 写默认 | `settings.update({ ns:'agent-presets', patch:{ default: id } })` | hero 菜单再次选择当前非默认项 |
 | 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | 仅 I3（无默认且全部隐藏） |
 | 默认被外部改 | `remote.$on('settings/document-updated', ns==='agent-presets')` → reconcile | 官方设置页与插件互相同步 |
-| 开新会话（+，复用空白） | `workspaces.startSession(target)` → 空白会话 current 后 `agentPreset.select({ sessionId, agentPreset })` | 工作区内已有可复用空白会话时 |
-| 开新会话（+，新建） | `session.create({ workspaceId, agentPreset })` → 名单回显后 `sessions.open(id)` | 创建即带预设：普通预设落到准备开始界面；warm-minimal 保持空白，等第一条真实用户消息进入 inbox 后才同步写入伪首轮 |
+| 开新会话（+） | `uiWorkspace.connectWorkspace(target)` → `agentPresets.select(sessionId, presetId)` → `sessions.open(sessionId)` | connect 统一复用或创建空白会话；select 成功并记录预设后才打开，失败留在当前界面并显示提示；Host patch 保留 wire 方法并改为按原始 Session id 激活 |
 | 打开会话 | `ctx.sessions.open(id)` | 现有服务动词 |
 | 排序/隐藏/改名 | 无 RPC，落 §4.1 的本地 store | 显示层数据 |
 
-**+ 按钮 workspace 目标**：显式选择的工作区 → 当前会话所在工作区 → 最近工作区 → 无工作区则无操作（给出提示）。复用规则照搬 `connectWorkspace`（blank 且 cwd 等于工作区路径的成员会话；已跑过一轮的会话 blank 已翻 false，不会被误复用）。
+**+ 按钮 workspace 目标**：弹出当前工作区名单并要求显式选择；无工作区时不给 connect/open，显示提示。复用规则由 `connectWorkspace` 负责（blank 且 cwd 等于工作区路径的成员会话；已跑过一轮的会话 blank 已翻 false，不会被误复用）。
 
 ## 6. 组件结构
 
@@ -207,12 +208,12 @@ src/client/
 1. **启动/刷新**：load roster → 原子 reconcile 生命周期与 I1/I2 → 发布 ready → 分组树不显示默认控件，hero 菜单标记默认项。
 2. **默认切换**：hero 菜单再次选择当前非默认项 → 写 `settings.default` → 回读 roster → “默认”标记移动；写入失败显示提示。选择不同项只切换当前预设，当前默认项重复选择不写。
 3. **隐藏**：加入 `hidden`、不改 `order` → 组行**置灰并固定在显示列表末尾** → shadow chip 不再出现；切换视图或 reload 后保持，取消隐藏恢复原位置；默认预设的隐藏被拒绝。
-4. **以预设开始新会话**：见 §5（复用空白会话 → stage→apply；否则 `session.create` 带预设创建 → 回显后打开，落到准备开始界面）。
+4. **以预设开始新会话**：见 §5（connect 解析或创建空白会话 → 在该 id 上 select → 成功后 open，落到准备开始界面；普通 hero 选择仍使用 stage→apply）。
 5. **重命名**：对话框写 `overrides`；不改 id、不写 `preset.yml`。
 
 ## 8. 已知限制（v1）
 
-1. 需要 harness 补丁（ui-workspace 一个包，60–80 行）并重建 web bundle；dsh 升级时补丁可能需重新适配（`--check` 先测）。
+1. 需要 harness 补丁并重建 Host 与 web bundle；dsh 升级时补丁可能需重新适配（`--check` 先测）。
 2. 重命名是显示层覆盖：不写 `preset.yml`，官方设置页"预设"节仍显示原名；不改 id。
 3. 顺序/隐藏只影响分组树 + shadow chip；官方设置页预设列表保持 host 顺序。
 4. 组内会话固定按最近更新排序（v1）。
@@ -223,7 +224,7 @@ src/client/
 
 | 阶段 | 内容 | 估时 |
 |---|---|---|
-| P0 | 生成 `patches/harness-groupby-preset.patch`，apply + 重建 ui-workspace bundle + 验证菜单第三项出现 | 0.5 天 |
+| P0 | 生成 `patches/harness-groupby-preset.patch`，apply + 重建 Host/ui-workspace + 验证菜单第三项出现 | 0.5 天 |
 | P1 | 插件骨架 + 分组树（组行/会话行/未分组/搜索过滤）+ 打开会话 + + 新会话 | 1–1.5 天 |
 | P2 | 管理：hero 默认入口、拖拽、隐藏/取消隐藏、重命名、reconcile、shadow SeatChip | 1.5–2 天 |
 | P3 | 打磨：空态/错误路径、uninstall 脚本验证、README 完整化、真机全流程验证 | 1 天 |
@@ -241,10 +242,10 @@ src/client/
 ```
 dsh-preset-manager/
 ├── patches/
-│   └── harness-groupby-preset.patch   # ui-workspace 扩展点与官方行 owner 契约（unified diff）
+│   └── harness-groupby-preset.patch   # ui-workspace 席位、历史投影回填与冷 preset 选择（unified diff）
 ├── scripts/
 │   ├── build.sh        # junction 链接 checkout 依赖 + tsc + tsdown
-│   ├── setup.sh        # 补丁 --check+apply → 重建 ui-workspace bundle → 构建本插件 → dsh plugin add
+│   ├── setup.sh        # 补丁 --check+apply → 重生成 catalog → 重建 Host/UI → 构建插件 → dsh plugin add
 │   └── uninstall.sh    # 回滚补丁 + 卸 bundle
 ├── src/index.ts        # 节点半身：identity apply（装配锚点）
 ├── src/client/         # 浏览器半身（§6）

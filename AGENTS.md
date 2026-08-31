@@ -11,8 +11,8 @@
 ## 装配模型
 
 - 本包是**双面 bundle 插件**：`cordis.patch.yml` 身份行（节点半身 = identity apply）+ `dsh.client`（浏览器半身）。
-- **补丁路线**：`patches/harness-groupby-preset.patch` 只动 `@deepseek-ai/dsh-client-ui-workspace` 一个包：增加 preset 分组模式、子 slot，以及由 Workspace owner 提供的官方 Session 投影与行渲染席位。具体落点随目标 harness 版本演进；改补丁必须同步 DESIGN.md §3.1 与 README。
-- 装配：`scripts/setup.sh`（`git apply --check` → apply → 重建 ui-workspace bundle → 构建本插件 → `dsh plugin add`）；`lib/` 与补丁产物提交进 git。
+- **补丁路线**：`patches/harness-groupby-preset.patch` 增加 ui-workspace preset 分组席位，并让 session projection cache 向列表报告和有界回填缺失的当前客户端投影。具体落点随目标 harness 版本演进；改补丁必须同步 DESIGN.md §3.1、`patches/README.md` 与 README。
+- 装配：`scripts/setup.sh`（`git apply --check` → apply → 重生成共享 catalog → 构建 Host 与 ui-workspace → 构建本插件 → `dsh plugin add`）；`lib/` 与静态补丁提交进 git，共享生成物不由补丁独占。
 - 一切改动必须过 `bash scripts/build.sh`（DSH_CHECKOUT 指向 dsh 源码 checkout）。
 
 ## 约束（为什么这么设计）

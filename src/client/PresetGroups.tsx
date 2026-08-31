@@ -34,9 +34,9 @@ export interface PresetGroupsInjected {
   /** Open a real Session. */
   open: (sessionId: SessionId) => void
   /**
-   * Stage a preset for the next session and start it in the chosen (or
-   * resolved) workspace; returns a message key (translated by the tree) when
-   * no workspace can take the session or the create failed.
+   * Resolve a blank Session in the chosen workspace, select its preset, then
+   * open it; returns a message key when no workspace can take the Session or
+   * connect/selection failed.
    */
   startSessionByPreset: (id: string, workspaceId?: WorkspaceId) => Promise<PresetManagerKey | undefined>
   /** Hide a preset (rejected for the default one; I3 unset may follow). */

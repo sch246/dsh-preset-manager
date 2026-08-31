@@ -15,7 +15,8 @@
  * The default lives in the official `agent-presets.default` setting;
  * `settings/document-updated` keeps both surfaces and the settings page in
  * sync. Zero new RPCs: roster reads, settings writes, and the official
- * stage→apply session flow are all existing verbs (DESIGN.md §5).
+ * hero stage→apply and preset-group connect→select→open flows are all
+ * existing verbs (DESIGN.md §5).
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
@@ -40,6 +41,7 @@ import type { HostPreset, PresetManagerState, RosterSnapshot } from './roster.ts
 import { planHide, planUnhide, shouldUnsetDefault } from './roster.ts'
 import { PresetGroups, type PresetGroupsInjected } from './PresetGroups.tsx'
 import { SeatChip, type SeatChipInjected, type SeatState } from './SeatChip.tsx'
+import { startPresetSession } from './start-session.ts'
 import { createPresetManagerStore, type PresetManagerBakedActions } from './stores.ts'
 
 /** The agent-preset settings namespace on the host wire (stable official name). */
@@ -180,13 +182,6 @@ class SeatController {
   private fallback = ''
   /** Set while a pick is waiting for a session; cleared once applied. */
   private staged: string | undefined
-  /**
-   * Set while the + flow is waiting for the NEXT blank session: unlike a
-   * hero-chip pick (which dies when a started session is current), this
-   * stage must survive the running conversation until the workspace connect
-   * makes its blank session current.
-   */
-  private pendingApply = false
 
   constructor(
     private readonly remote: Pick<ClientRemote, 'agentPresets'>,
@@ -220,27 +215,20 @@ class SeatController {
   /** Stage one preset for the next session, applying immediately when a blank session is current. */
   async select(id: string): Promise<void> {
     if (this.store.getSnapshot().busy) return
-    this.pendingApply = false
     this.stage(id)
     await this.apply()
   }
 
-  /** Stage WITHOUT the immediate apply (the tree's + button starts the session after the pick). */
-  stage(id: string): void {
+  /** Retain a hero pick until its blank Session becomes current. */
+  private stage(id: string): void {
     this.staged = id
     this.set({ current: id, error: null })
   }
 
-  /**
-   * The + flow's stage: set before the workspace connect, applied by the
-   * list-change applier once the connect's blank session becomes current.
-   * The stage survives intermediate non-blank currents (the running
-   * conversation the user is leaving), so the pick cannot be lost mid-flight.
-   */
-  stageForNext(id: string): void {
-    this.staged = id
-    this.pendingApply = true
-    this.set({ current: id, error: null })
+  /** Adopt a successful preset-group selection without staging another apply. */
+  acceptSelection(id: string): void {
+    this.staged = undefined
+    this.set({ current: id, error: null, busy: false })
   }
 
   /** Hand the staged choice to the current session, if there is one to take it. */
@@ -248,11 +236,7 @@ class SeatController {
     const staged = this.staged
     const session = this.currentSession()
     if (staged === undefined || session === undefined) return
-    // A + flow stage waits for the blank session the connect is about to
-    // produce; the still-current started conversation must not consume it.
-    if (this.pendingApply) {
-      if (!session.blank) return
-    } else if (!session.blank || presetOf(session) === staged) {
+    if (!session.blank || presetOf(session) === staged) {
       this.staged = undefined
       return
     }
@@ -260,7 +244,6 @@ class SeatController {
     try {
       const response = await this.remote.agentPresets.select(session.id, staged)
       this.staged = undefined
-      this.pendingApply = false
       if (!response.ok) {
         this.set({ busy: false, error: response.error.message, current: this.fallback })
         return
@@ -268,7 +251,6 @@ class SeatController {
       this.set({ busy: false, current: response.value })
     } catch (error) {
       this.staged = undefined
-      this.pendingApply = false
       this.set({ busy: false, error: messageOf(error), current: this.fallback })
     }
   }
@@ -282,7 +264,7 @@ function presetOf(session: SeatSessionSummary | undefined): string | undefined {
 
 /** Required services (cordis fiber inject); the inner scope adds conversation/sessions/workspaces. */
 export const inject = [
-  'slots', 'locale', 'remote', 'remote.agentPresets', 'remote.settings', 'sessions',
+  'slots', 'locale', 'remote', 'remote.agentPresets', 'remote.settings', 'sessions', 'uiWorkspace',
 ]
 
 /**
@@ -300,6 +282,16 @@ export function apply(ctx: ClientContext): void {
   let currentActions: PresetManagerBakedActions | undefined
   let startSessionByPreset: (id: string, workspaceId?: WorkspaceId) => Promise<PresetManagerKey | undefined> = async () => 'action.failed'
   let seatRef: SeatController | undefined
+  // The root preset tree can precede the conversation child scope. Bind its
+  // navigation while the root services are available; seat reconciliation is optional.
+  startSessionByPreset = async (id: string, workspaceId?: WorkspaceId): Promise<PresetManagerKey | undefined> => {
+    return startPresetSession({
+      connectWorkspace: target => ctx.uiWorkspace.connectWorkspace(target),
+      selectPreset: (sessionId, presetId) => ctx.remote.agentPresets.select(sessionId, presetId),
+      acceptSelection: selected => seatRef?.acceptSelection(selected),
+      open: sessionId => ctx.sessions.open(sessionId),
+    }, id, workspaceId)
+  }
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-preset-manager: dictionaries')
 
@@ -346,7 +338,7 @@ export function apply(ctx: ClientContext): void {
   // The shadow chip: same conversation scope as the official chip, lower
   // priority (legal shadow; uninstalling restores the official entry).
   ctx.inject([
-    'slots', 'conversation', 'sessions', 'uiWorkspace', 'remote', 'remote.agentPresets',
+    'slots', 'conversation', 'sessions', 'remote', 'remote.agentPresets',
   ], (scope: ClientContext) => {
     const seatCtl = new SeatController(
       scope.remote,
@@ -365,21 +357,9 @@ export function apply(ctx: ClientContext): void {
       },
     )
     seatRef = seatCtl
-    // The tree's + button: resolve the workspace (explicit pick → current →
-    // recent) through the official Workspace navigation controller. The
-    // staged preset applies when that controller creates or reuses the blank
-    // Session and opens it. No workspace at all means no action.
-    startSessionByPreset = async (id: string, workspaceId?: WorkspaceId): Promise<PresetManagerKey | undefined> => {
-      if (workspaceId === undefined) return 'start.noWorkspace'
-      seatRef?.stageForNext(id)
-      scope.uiWorkspace.startSession(workspaceId)
-      return undefined
-    }
-
     scope.effect(() => {
-      // A connecting workspace creates or reuses a blank session and either
-      // way the chip's pick predates it — the stage applies when the session
-      // arrives (official seat semantics).
+      // A hero pick made without a current Session applies when a later
+      // Workspace navigation makes a blank Session current.
       const stop = scope.sessions.list.subscribe(() => { void seatCtl.apply() })
       const settingsMoved = scope.remote.$on('settings/document-updated', (ns) => {
         if (ns !== AGENT_PRESET_SETTINGS_NS) return

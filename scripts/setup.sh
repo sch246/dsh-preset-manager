@@ -45,6 +45,14 @@ verify_source_markers() {
     packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
     packages/client/ui-workspace/src/client/contract/slots.ts
     packages/client/ui-workspace/src/client/rows/Rows.tsx
+    packages/api/session-controller/src/list.ts
+    packages/api/session-controller/src/agent.ts
+    packages/api/session-controller/src/index.ts
+    packages/api/session-controller/src/preset-selection.ts
+    packages/preset/agent-presets/src/index.ts
+    packages/session/session-projection/src/index.ts
+    packages/session/session-projection-cache/src/index.ts
+    scripts/gen-cordis-catalog.ts
   )
   for path in "${paths[@]}"; do
     if ! grep -Fq "$needle" "$CHECKOUT/$path"; then
@@ -86,12 +94,13 @@ regenerate_shared_catalogs
   echo "patch_applied_by_setup=$PATCH_APPLIED_BY_SETUP"
   echo "host_head=$(git -C "$CHECKOUT" rev-parse HEAD)"
   echo "marker_schema=meta-intent-source-region/0.1"
-  echo "regions=sidebar.workspaces.presetGroups,workspace.rows.alternateGrouping,workspace.groupBy.preset"
-  echo "generated_catalogs=packages/extensions/cordis-client-runner/src/client/slot-catalog.ts,packages/extensions/cordis-client-runner/src/client/api-catalog.ts"
+  echo "regions=sidebar.workspaces.presetGroups,workspace.rows.alternateGrouping,workspace.groupBy.preset,session.list.incompleteProjectionProbe,sessionProjection.checkpointCompleteness,sessionProjectionCache.cachedCompleteness,session.agentPresetSelectionEndpoint,session.agentPresetSelectionActivation,session.agentPresetSelectionAssemblyImport,session.agentPresetSelectionAssemblyExport,session.agentPresetSelectionAssemblyMount,session.agentPresetSelectionAssemblyMethod,session.agentPresetSelectionRemote,session.agentPresetSelectionCatalogService,agentPresets.sessionAddressedSelection,agentPresets.preparedSelectionCatalogOwner"
+  echo "generators=pnpm run gen-client-catalog|pnpm run gen-cordis-api"
+  echo "generated_catalogs=packages/extensions/cordis-client-runner/src/client/slot-catalog.ts,packages/extensions/tool-cordis/src/api-catalog.ts,docs/subsystems/session-projection.md,docs/subsystems/session-projection.zh.md,docs/subsystems/session-projection.i18n.yaml"
 } > "$STATE_FILE"
 
-echo "rebuilding ui-workspace bundle..."
-(cd "$CHECKOUT" && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
+echo "rebuilding changed Host, Remote client, and ui-workspace faces..."
+(cd "$CHECKOUT" && pnpm run build:lib:host && pnpm --filter @deepseek-ai/dsh-api-remotes bundle && pnpm --filter @deepseek-ai/dsh-client-ui-workspace bundle)
 
 echo "building dsh-preset-manager..."
 bash "$REPO_DIR/scripts/build.sh"

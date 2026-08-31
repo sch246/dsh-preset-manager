@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.16",
+  "revision": "0.1.0-draft.19",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -17,7 +17,11 @@
     "../logs/2026-08-26-marker-locator-simplification.md",
     "../logs/2026-08-26-purpose-comment-marker-correction.md",
     "../logs/2026-08-26-remote-baseline-correction.md",
-    "../logs/2026-08-31-default-entry-and-sidebar-simplification.md"
+    "../logs/2026-08-31-default-entry-and-sidebar-simplification.md",
+    "../logs/2026-08-31-preset-start-open-order-mismatch.md",
+    "../logs/2026-08-31-historical-preset-projection-cache-mismatch.md",
+    "../logs/2026-08-31-preset-start-handler-scope-mismatch.md",
+    "../logs/2026-08-31-cold-preset-selection-lookup-mismatch.md"
   ],
   "protocol": {
     "id": "meta-intent",
@@ -33,7 +37,7 @@
       "kind": "git-repository",
       "uri": "https://github.com/sch246/dsh-preset-manager.git",
       "revision": "e82f6dcf83fab6e795b0bc5c4abf7fdfcfc14095",
-      "scope": "immutable current source identity selected by candidate 1"
+      "scope": "last sealed source identity; not selected by the current draft"
     },
     {
       "id": "target.deepseek-harness",
@@ -44,7 +48,5 @@
     }
   ],
   "activeLocks": [],
-  "candidateLocks": [
-    "../locks/preset-manager-linux-web-0.1.0-candidate.3/LOCK.json"
-  ]
+  "candidateLocks": []
 }

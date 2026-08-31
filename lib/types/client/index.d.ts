@@ -15,7 +15,8 @@
  * The default lives in the official `agent-presets.default` setting;
  * `settings/document-updated` keeps both surfaces and the settings page in
  * sync. Zero new RPCs: roster reads, settings writes, and the official
- * stage→apply session flow are all existing verbs (DESIGN.md §5).
+ * hero stage→apply and preset-group connect→select→open flows are all
+ * existing verbs (DESIGN.md §5).
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis';
 import { type PresetManagerKey } from './locales.ts';

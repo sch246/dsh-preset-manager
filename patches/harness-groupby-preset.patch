@@ -1,48 +1,881 @@
+diff --git a/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.i18n.yaml b/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.i18n.yaml
+new file mode 100644
+index 0000000000..971b96c447
+--- /dev/null
++++ b/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.md
++2026-08-31-bounded-cold-projection-cache-backfill.md: 3d55b452c7a66b9fc2851ce07caefdcb9f21b7f3
++2026-08-31-bounded-cold-projection-cache-backfill.zh.md: a06e01d294abd6dbf0ae20c5be65b578eae3c931
+diff --git a/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.md b/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.md
+new file mode 100644
+index 0000000000..3d55b452c7
+--- /dev/null
++++ b/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.md
+@@ -0,0 +1,37 @@
++# Agent Note: Backfill incomplete cold projection caches within the list probe bound
++
++Status: implemented
++
++English | [中文](2026-08-31-bounded-cold-projection-cache-backfill.zh.md)
++
++## Problem
++
++The projection cache could contain valid rows for older client-visible units while missing a unit registered by the current composition or retaining that unit at an incompatible `stateVersion`. Session listing treated a cached `sessionListMetadata.blank: false` row as sufficient and skipped its bounded cold observation, so opening the same Session repeatedly remained the only way to reconstruct the missing client values. The cache was still a valid acceleration, but consumers had no generic signal that its selected client-visible rows were incomplete.
++
++## Decision
++
++The projection registry reports checkpoint completeness against the currently registered client-visible units. A selected row is usable only when its key is present, its `stateVersion` matches, and its stored state and client view pass their schemas. Host-only units do not affect client completeness, and an explicitly empty selection is complete.
++
++`cachedSnapshot` includes this completeness signal with any usable values. Session listing retains its consumer-owned `coldBlankProbeMaxBytes` policy: a missing or incomplete cache makes a physically bounded cold artifact eligible for one exact Session observation. A prepared observation supplies its complete ordered log to `coldSnapshot`, which refolds and schedules a fail-soft write of the complete current checkpoint. The cache never locates or reads Session persistence itself.
++
++A live observation is not written through the cold path because its events may lead the durable log. Artifacts above the bound, location-less sources, vanished files, and failed observations remain visible with their available stale hints. Subagent listing keeps its cache/observation resolution and does not write back because that consumer has no bounded source policy.
++
++## Relationship to existing decisions
++
++This decision preserves the state/client-view split in [Separate session projection state from client views](../architecture/2026-08-19-session-projection-state-and-client-views.md), the persistence-independent cache ownership in [Projection cache as per-session files](../architecture/2026-08-19-projection-cache-per-session-files.md), and the consumer-owned read policies in [Session observations and projection-owned client state](../architecture/2026-08-25-session-observations-and-projection-owned-client-state.md). It extends the bounded fallback from [Bound cold blank-session verification](2026-08-13-bounded-cold-blank-verification.md) to repair incomplete client projection rows without expanding the artifact-size budget.
++
++## Alternatives considered
++
++**Treat any cached non-blank metadata as sufficient.** Rejected because a valid row for one unit says nothing about client-visible units registered later or bumped to a new state version.
++
++**Let the cache discover and read Session persistence.** Rejected because it would couple the optional acceleration layer to a source backend and duplicate the source and race policy already owned by SessionQuery and its consumers.
++
++**Refold every incomplete cached Session during listing.** Rejected because list latency and I/O would scale with the complete cold corpus. The existing physical-size bound keeps repair work explicit and conservative.
++
++**Write back every exact observation.** Rejected because other consumers have different work budgets, and a live observation can lead the durable log. The bounded Session-list consumer is the current source of authority for this repair.
++
++## Consequences
++
++Adding or version-bumping a client-visible projection converges cache records when users list eligible small cold Sessions. The refolded values serve the current list immediately while the cache refresh completes asynchronously; a failed refresh logs a warning and leaves the source projection successful. Large or unavailable artifacts can remain incomplete until another durable checkpoint path runs, so their list rows stay visible and may omit newer hints.
++
++Focused registry tests cover missing, mismatched, malformed, selected, and host-only rows. Cache tests cover incomplete detection and asynchronous write-back. Session Controller tests cover an incomplete cached non-blank row entering the bounded observation path while large and failed sources preserve conservative visibility.
+diff --git a/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.zh.md b/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.zh.md
+new file mode 100644
+index 0000000000..a06e01d294
+--- /dev/null
++++ b/.agents/notes/implemented/bug-fix/2026-08-31-bounded-cold-projection-cache-backfill.zh.md
+@@ -0,0 +1,37 @@
++# Agent Note: 在列表探测上限内回填不完整的冷投影缓存
++
++Status: implemented
++
++[English](2026-08-31-bounded-cold-projection-cache-backfill.md) | 中文
++
++## Problem
++
++投影缓存可能包含旧 client-visible 单元的有效行，却缺少当前组合注册的单元，或保留该单元不兼容 `stateVersion` 的行。Session 列表把已缓存的 `sessionListMetadata.blank: false` 行视为充分条件并跳过有界冷观察，因此只有反复打开同一个 Session 才能重建缺失的客户端值。缓存仍是有效的加速层，但消费方没有通用信号来判断所选 client-visible 行是否完整。
++
++## Decision
++
++投影注册表根据当前已注册 client-visible 单元报告检查点完整性。只有 key 存在、`stateVersion` 匹配，且存储状态与客户端视图都通过各自 schema 时，选中行才可用。host-only 单元不影响客户端完整性，显式空选择为完整。
++
++`cachedSnapshot` 随任何可用值返回该完整性信号。Session 列表保留消费方拥有的 `coldBlankProbeMaxBytes` 策略：缺失或不完整缓存使物理大小受限的冷工件有资格接受一次精确 Session 观察。prepared observation 把完整有序日志交给 `coldSnapshot`；后者重新折叠，并调度一次完整当前检查点的 fail-soft 写入。缓存本身绝不定位或读取 Session persistence。
++
++live observation 不通过冷路径写入，因为其事件可能领先 durable log。超出上限的工件、无 location 的来源、已消失文件和失败观察都携带已有陈旧 hints 保持可见。Subagent 列表保留其缓存/观察解析且不写回，因为该消费方没有有界来源策略。
++
++## Relationship to existing decisions
++
++本决策保留[分离会话投影状态与客户端视图](../architecture/2026-08-19-session-projection-state-and-client-views.zh.md)中的状态/客户端视图拆分、[将投影缓存保存为逐会话文件](../architecture/2026-08-19-projection-cache-per-session-files.zh.md)中与 persistence 解耦的缓存所有权，以及[会话观察与投影拥有的客户端状态](../architecture/2026-08-25-session-observations-and-projection-owned-client-state.zh.md)中由消费方拥有的读取策略。它把[限制冷空白会话验证](2026-08-13-bounded-cold-blank-verification.zh.md)的有界 fallback 扩展到修复不完整客户端投影行，且不扩大工件大小预算。
++
++## Alternatives considered
++
++**把任何已缓存的非空白元数据视为充分条件。** 拒绝，因为一个单元的有效行无法说明之后注册或升级到新状态版本的 client-visible 单元是否可用。
++
++**让缓存发现并读取 Session persistence。** 拒绝，因为这会把可选加速层耦合到来源后端，并重复 SessionQuery 及其消费方已经拥有的来源与竞态策略。
++
++**列表期间重新折叠每个缓存不完整的 Session。** 拒绝，因为列表延迟与 I/O 会随完整冷语料库增长。现有物理大小上限让修复工作保持显式且保守。
++
++**写回每个精确观察。** 拒绝，因为其他消费方有不同工作预算，而且 live observation 可能领先 durable log。有界 Session 列表消费方是当前该修复的权威来源。
++
++## Consequences
++
++增加 client-visible 投影或提高其版本后，用户列出符合条件的小型冷 Session 时，缓存记录会收敛。重新折叠的值立即服务当前列表，而缓存刷新异步完成；刷新失败会记录警告，但来源投影仍成功。大型或不可用工件在其他持久检查点路径运行前可能保持不完整，因此其列表行继续可见，并可能缺少较新的 hints。
++
++聚焦注册表测试覆盖缺失、不匹配、畸形、选中与 host-only 行。缓存测试覆盖不完整检测与异步写回。Session Controller 测试覆盖不完整且已缓存的非空白行进入有界观察路径，同时大型和失败来源维持保守可见性。
+diff --git a/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.i18n.yaml b/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.i18n.yaml
+new file mode 100644
+index 0000000000..87d5a48d6e
+--- /dev/null
++++ b/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.md
++2026-08-31-session-addressed-cold-preset-selection.md: 2fbb393b7f66ed7cf3bd1eaad7512b3a76c6992b
++2026-08-31-session-addressed-cold-preset-selection.zh.md: e2a70891076721c12c1dc55eab752445e456c7e1
+diff --git a/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.md b/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.md
+new file mode 100644
+index 0000000000..2fbb393b7f
+--- /dev/null
++++ b/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.md
+@@ -0,0 +1,37 @@
++# Agent Note: Session-addressed cold preset selection
++
++Status: implemented
++
++English | [中文](2026-08-31-session-addressed-cold-preset-selection.zh.md)
++
++## Problem
++
++The `agentPresets/select` Remote accepted an `Agent`, so API Gateway resolved its wire Session id through the shared Agent lookup before the target preset reached the selection service. Resolving a cold Session composes its recorded preset. A blank Session whose recorded preset had been removed or broken therefore could not select an available replacement, although the target composition and restored log were sufficient to decide the operation.
++
++Concurrent activation made the outcome timing-dependent. A valid selection that shared an unrelated resume failure inherited that failure instead of retrying with its own target.
++
++## Decision
++
++The wire operation remains `agentPresets/select(SessionId, presetId)`, but `SessionAgentPresets` in Session Controller owns that endpoint. The Agent Presets service owns the domain operations over a supplied live or unpublished Agent; its `select(Agent, presetId)` method is not a Remote lookup endpoint.
++
++Session Controller delegates a live ordinary Agent directly to the domain selection. For a cold ordinary Session, it observes the exact persisted log, prepares only the requested target composition on an unpublished Agent, publishes the Agent, and then appends `agent-preset/selected`. The restored log supplies the `turn/start` lock check. An unavailable target, subagent-owned identity, restore failure, or publication failure leaves the Agent unpublished and the durable selection unchanged.
++
++Cold selection shares an in-flight activation when it succeeds. If a shared activation fails for a reason that a target-specific activation can bypass, the waiting selection retries through its own target. The owner of a target-specific activation retains the stable preset-domain failure produced for that target.
++
++The generated Client namespace is assembled from two contributions: Agent Presets supplies roster and authoring methods, while Session Controller supplies `select`. Gateway and Client registries merge distinct methods under one namespace and reject duplicate endpoints.
++
++## Alternatives considered
++
++**Add request context to every Typert lookup resolver.** Rejected because this one operation needs both the raw Session identity and target preset, while extending the lookup protocol would change every provider and retain selection policy in a generic identity resolver.
++
++**Make the shared Agent lookup skip recorded composition.** Rejected because all other Agent-addressed operations require a fully composed live Agent and depend on strict cold-resume behavior.
++
++**Rewrite the Session creation header.** Rejected because the append-only selection event and its projection already own composition changes after creation; mutating the header would introduce a second durable authority.
++
++**Record the selection before Agent publication.** Rejected because a later synchronous creation listener can veto publication after Session persistence has observed the event, leaving a failed operation in the durable log.
++
++## Consequences
++
++A blank persisted Session can recover from a deleted or broken recorded preset by choosing an available target. The target composition exists before any Agent publication notification, while the selection event is appended only after the complete publication sequence succeeds. Session and Agent creation listeners can therefore observe the target composition before the corresponding selection event is appended; callers cannot observe a successful selection response until both publication and event append complete.
++
++Focused tests cover live and cold selection, restored turn locking, invalid targets without publication or events, concurrent target failures, and takeover after an unrelated recorded-preset resume fails. Generated Host descriptors keep the raw `SessionId` as a JSON parameter and the Client type merges `select` with the other `agentPresets` methods.
+diff --git a/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.zh.md b/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.zh.md
+new file mode 100644
+index 0000000000..e2a7089107
+--- /dev/null
++++ b/.agents/notes/implemented/bug-fix/2026-08-31-session-addressed-cold-preset-selection.zh.md
+@@ -0,0 +1,37 @@
++# Agent Note: 按 Session 寻址的冷 preset 选择
++
++Status: implemented
++
++[English](2026-08-31-session-addressed-cold-preset-selection.md) | 中文
++
++## 问题
++
++`agentPresets/select` Remote 接受 `Agent`，因此 API Gateway 会在目标 preset 到达选择服务之前，先通过共享 Agent lookup 解析 wire Session id。解析冷 Session 会组装它记录的 preset。于是，若空白 Session 记录的 preset 已被移除或损坏，即使目标组装与恢复出的日志足以决定操作，它仍无法选择可用替代项。
++
++并发激活还会让结果取决于时序。有效选择若共享了一次无关的恢复失败，会继承该失败，而不是以自己的目标重试。
++
++## 决策
++
++wire 操作保持为 `agentPresets/select(SessionId, presetId)`，但由 Session Controller 内的 `SessionAgentPresets` 拥有该 endpoint。Agent Presets 服务拥有针对已提供的 live 或未发布 Agent 的领域操作；其 `select(Agent, presetId)` 方法不是 Remote lookup endpoint。
++
++Session Controller 把已有的普通 Agent 直接交给领域选择。对于冷普通 Session，它观察完整持久日志，只在未发布的 Agent 上准备请求的目标组装，发布 Agent，然后追加 `agent-preset/selected`。恢复出的日志提供 `turn/start` 锁定检查。目标不可用、身份属于 subagent、恢复失败或发布失败时，Agent 保持未发布，持久化选择保持不变。
++
++冷选择会共享成功的进行中激活。若共享激活因目标专属激活可以绕开的原因失败，等待中的选择会通过自己的目标重试。目标专属激活的所有者保留该目标产生的稳定 preset 领域错误。
++
++生成的 Client namespace 由两份 contribution 组装：Agent Presets 提供名单与创作方法，Session Controller 提供 `select`。Gateway 与 Client registry 会合并同一 namespace 下的不同方法，并拒绝重复 endpoint。
++
++## 考虑过的替代方案
++
++**为每个 Typert lookup resolver 增加请求上下文。** 未采用，因为只有这项操作同时需要原始 Session 身份与目标 preset；扩展 lookup protocol 会改变所有 provider，并继续把选择策略留在通用身份 resolver 中。
++
++**让共享 Agent lookup 跳过已记录组装。** 未采用，因为其他所有按 Agent 寻址的操作都要求完整组装的 live Agent，并依赖严格的冷恢复行为。
++
++**重写 Session 创建 header。** 未采用，因为追加式选择事件及其投影已拥有创建后的组装变化；修改 header 会引入第二个持久化权威。
++
++**在 Agent 发布前记录选择。** 未采用，因为后续同步创建 listener 可以否决发布，而 Session persistence 已经观察到该事件，从而让失败操作留在持久日志中。
++
++## 后果
++
++持久化空白 Session 可以通过选择可用目标，从已删除或损坏的记录 preset 中恢复。任何 Agent 发布通知发生前，目标组装已经存在；完整发布序列成功后才追加选择事件。因此，Session 与 Agent 创建 listener 可能先观察到目标组装，再观察到对应选择事件；调用方只有在发布和事件追加均完成后才能观察到成功响应。
++
++聚焦测试覆盖 live 与 cold 选择、恢复出的 turn 锁定、无发布且无事件的无效目标、并发目标失败，以及与记录 preset 无关的恢复失败后的接管。生成的 Host descriptor 把原始 `SessionId` 保持为 JSON 参数，Client 类型则把 `select` 与其他 `agentPresets` 方法合并。
+diff --git a/packages/api/session-controller/README.i18n.yaml b/packages/api/session-controller/README.i18n.yaml
+index fc66cdfceb..3636959314 100644
+--- a/packages/api/session-controller/README.i18n.yaml
++++ b/packages/api/session-controller/README.i18n.yaml
+@@ -5,2 +5,2 @@
+-README.md: 689635b83bce71e3aecfedf371685a24bede55ab
+-README.zh.md: 68da7db60b38aca1b72c991005438ced45b348ea
++README.md: 751305eb73cc7a39a1dce670d7359814ce8ccebc
++README.zh.md: be6c325d4527996c11a15d2c23ff9c7ce51a8c6f
+diff --git a/packages/api/session-controller/README.md b/packages/api/session-controller/README.md
+index 689635b83b..751305eb73 100644
+--- a/packages/api/session-controller/README.md
++++ b/packages/api/session-controller/README.md
+@@ -11 +11 @@ English | [中文](README.zh.md)
+-`@deepseek-ai/dsh-api-session-controller` owns the Host `ctx.sessionController` service and the generated Client `session`, `skills`, and `fileReferences` Remote namespaces. It serves Session lifecycle and history, the Host-generation model catalog, workspace-path opening, user-invocable skill discovery, and the adapter for Agent-scoped file references. Use it through API Gateway when a Client needs operations addressed by a Session.
++`@deepseek-ai/dsh-api-session-controller` owns the Host `ctx.sessionController` service and the generated Client `session`, `skills`, `fileReferences`, and `agentPresets/select` Remote surfaces. It serves Session lifecycle and history, the Host-generation model catalog, workspace-path opening, user-invocable skill discovery, preset selection, and the adapter for Agent-scoped file references. Use it through API Gateway when a Client needs operations addressed by a Session.
+@@ -29,0 +30,2 @@ Each endpoint states its activation policy. List, search, attachment, history pa
++`agentPresets/select` accepts a raw Session id because selecting a preset is part of activation rather than a generic Agent lookup. A live blank Agent switches in place. A cold blank Session is restored under the requested target composition, then records the selection after Agent publication succeeds; it does not compose the previously recorded preset first. Target validation, restored `turn/start` history, and ordinary-Session ownership can reject the operation without publishing an Agent or recording a selection. A selection waiting on an unrelated failed resume retries activation under its own target.
++
+@@ -41 +43 @@ The Session object also carries local submission echoes: `session.beginSubmissio
+-| `coldBlankProbeMaxBytes` | `1,024` | Maximum physical size of a cold Session artifact eligible for blankness verification; `0` disables probes |
++| `coldBlankProbeMaxBytes` | `1,024` | Maximum physical size of a cold Session artifact eligible for blankness verification and incomplete projection-cache backfill; `0` disables probes |
+diff --git a/packages/api/session-controller/README.zh.md b/packages/api/session-controller/README.zh.md
+index 68da7db60b..be6c325d45 100644
+--- a/packages/api/session-controller/README.zh.md
++++ b/packages/api/session-controller/README.zh.md
+@@ -11 +11 @@ kind: "package-reference"
+-`@deepseek-ai/dsh-api-session-controller` 拥有 Host 的 `ctx.sessionController` 服务，以及生成的 Client `session`、`skills` 和 `fileReferences` Remote namespace。它提供 Session 生命周期与历史、Host generation 模型目录、工作区路径打开、用户可调用 skill 发现，以及面向 Agent 的文件引用 adapter。当 Client 需要按 Session 寻址的操作时，请通过 API Gateway 使用它。
++`@deepseek-ai/dsh-api-session-controller` 拥有 Host 的 `ctx.sessionController` 服务，以及生成的 Client `session`、`skills`、`fileReferences` 与 `agentPresets/select` Remote surface。它提供 Session 生命周期与历史、Host generation 模型目录、工作区路径打开、用户可调用 skill 发现、preset 选择，以及面向 Agent 的文件引用 adapter。当 Client 需要按 Session 寻址的操作时，请通过 API Gateway 使用它。
+@@ -29,0 +30,2 @@ kind: "package-reference"
++`agentPresets/select` 接受原始 Session id，因为 preset 选择属于激活过程，而不是通用 Agent lookup。已有的空白 Agent 会原地切换。冷空白 Session 直接在请求的目标组装下恢复，并在 Agent 发布成功后记录选择；它不会先组装原先记录的 preset。目标校验、恢复出的 `turn/start` 历史与普通 Session 所有权都可以拒绝操作，且不发布 Agent、不记录选择。若选择正在等待一次无关的失败恢复，它会用自己的目标重试激活。
++
+@@ -41 +43 @@ Session 对象还承载本地提交回显：`session.beginSubmission` 在调用
+-| `coldBlankProbeMaxBytes` | `1,024` | 可进行空白状态验证的冷 Session 工件最大物理大小；`0` 禁用探测 |
++| `coldBlankProbeMaxBytes` | `1,024` | 可进行空白状态验证与不完整投影缓存回填的冷 Session 工件最大物理大小；`0` 禁用探测 |
+diff --git a/packages/api/session-controller/src/agent.ts b/packages/api/session-controller/src/agent.ts
+index f96c66b464..76dd973b6d 100644
+--- a/packages/api/session-controller/src/agent.ts
++++ b/packages/api/session-controller/src/agent.ts
+@@ -10 +10 @@ import type {} from '@deepseek-ai/dsh-agent-default-model'
+-import type {} from '@deepseek-ai/dsh-agent-presets'
++import type { PreparedAgentPresetSelection } from '@deepseek-ai/dsh-agent-presets'
+@@ -14 +14 @@ import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-ses
+-import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
++import { TypertLookupFailure, TypertRemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
+@@ -180,0 +181,56 @@ export class ApiSessionAgentController {
++  // @meta-intent:begin dsh-preset-manager session.agentPresetSelectionEndpoint
++  /**
++   * Select a preset for one blank live or persisted ordinary Session.
++   * @param sessionId - Session identity whose Agent owns the selection.
++   * @param agentPreset - target preset id.
++   * @returns the preset id committed to the Session.
++   * @throws {TypertRemoteFailure} for stable Session or preset-domain failures.
++   */
++  async selectPreset(sessionId: SessionId, agentPreset: string): Promise<string> {
++    const presets = this.ctx.get('agentPresets')
++    if (presets === undefined) {
++      throw new TypertRemoteFailure({
++        code: 'internal',
++        message: 'agent preset selection is unavailable: this deployment mounts no agent-presets service',
++        details: {},
++      })
++    }
++    while (true) {
++      const live = this.liveAgent(sessionId)
++      if (live !== undefined) {
++        if ('error' in live) throw new TypertRemoteFailure(live.error)
++        return await presets.select(live.agent, agentPreset)
++      }
++      const attached = this.ctx.sessions.get(sessionId)
++      if (attached !== undefined && hasApiSessionSubagentOwner(this.ctx, attached, undefined)) {
++        throw new TypertRemoteFailure(apiSessionSubagentOwnershipError(sessionId))
++      }
++
++      let resume = this.resumes.get(sessionId)
++      const ownsResume = resume === undefined
++      if (resume === undefined) {
++        resume = this.resume(sessionId, undefined, agentPreset)
++          .finally(() => { this.resumes.delete(sessionId) })
++        this.resumes.set(sessionId, resume)
++      }
++      try {
++        const agent = await resume
++        return ownsResume ? agentPreset : await presets.select(agent, agentPreset)
++      } catch (error: unknown) {
++        if (ownsResume && error instanceof TypertRemoteFailure) throw error
++        if (!ownsResume
++          && !(error instanceof ApiSessionNotFound)
++          && !(error instanceof ApiSessionSubagentOwnership)) {
++          const raced = this.liveAgent(sessionId)
++          if (raced === undefined) continue
++          if ('error' in raced) throw new TypertRemoteFailure(raced.error)
++          return await presets.select(raced.agent, agentPreset)
++        }
++        const found = this.resumeFailure(sessionId, error)
++        if ('error' in found) throw new TypertRemoteFailure(found.error)
++        return await presets.select(found.agent, agentPreset)
++      }
++    }
++  }
++  // @meta-intent:end dsh-preset-manager session.agentPresetSelectionEndpoint
++
+@@ -196,0 +253,7 @@ export class ApiSessionAgentController {
++    return this.resumeResult(sessionId, resume)
++  }
++
++  private async resumeResult(
++    sessionId: SessionId,
++    resume: Promise<Agent>,
++  ): Promise<ApiSessionAgentResult> {
+@@ -200,18 +263,6 @@ export class ApiSessionAgentController {
+-      if (error instanceof ApiSessionNotFound) {
+-        return {
+-          error: {
+-            code: 'session-not-found',
+-            message: error.message,
+-            details: { sessionId },
+-          },
+-        }
+-      }
+-      if (error instanceof ApiSessionSubagentOwnership) {
+-        return { error: apiSessionSubagentOwnershipError(error.sessionId) }
+-      }
+-      const raced = this.liveAgent(sessionId)
+-      if (raced !== undefined) return raced
+-      const racedSession = this.ctx.sessions.get(sessionId)
+-      if (racedSession !== undefined && hasApiSessionSubagentOwner(this.ctx, racedSession, undefined)) {
+-        return { error: apiSessionSubagentOwnershipError(sessionId) }
+-      }
++      return this.resumeFailure(sessionId, error)
++    }
++  }
++
++  private resumeFailure(sessionId: SessionId, error: unknown): ApiSessionAgentResult {
++    if (error instanceof ApiSessionNotFound) {
+@@ -220,3 +271,3 @@ export class ApiSessionAgentController {
+-          code: 'internal',
+-          message: `resume failed for session "${sessionId}": ${String(error)}`,
+-          details: {},
++          code: 'session-not-found',
++          message: error.message,
++          details: { sessionId },
+@@ -225,0 +277,16 @@ export class ApiSessionAgentController {
++    if (error instanceof ApiSessionSubagentOwnership) {
++      return { error: apiSessionSubagentOwnershipError(error.sessionId) }
++    }
++    const raced = this.liveAgent(sessionId)
++    if (raced !== undefined) return raced
++    const racedSession = this.ctx.sessions.get(sessionId)
++    if (racedSession !== undefined && hasApiSessionSubagentOwner(this.ctx, racedSession, undefined)) {
++      return { error: apiSessionSubagentOwnershipError(sessionId) }
++    }
++    return {
++      error: {
++        code: 'internal',
++        message: `resume failed for session "${sessionId}": ${String(error)}`,
++        details: {},
++      },
++    }
+@@ -402,2 +469,7 @@ export class ApiSessionAgentController {
+-  private async resume(sessionId: SessionId, supplied?: SessionObservation): Promise<Agent> {
+-    if (supplied !== undefined) return this.resumeObserved(sessionId, supplied)
++  // @meta-intent:begin dsh-preset-manager session.agentPresetSelectionActivation
++  private async resume(
++    sessionId: SessionId,
++    supplied?: SessionObservation,
++    selectedPreset?: string,
++  ): Promise<Agent> {
++    if (supplied !== undefined) return this.resumeObserved(sessionId, supplied, selectedPreset)
+@@ -406 +478 @@ export class ApiSessionAgentController {
+-      return await this.resumeObserved(sessionId, observation)
++      return await this.resumeObserved(sessionId, observation, selectedPreset)
+@@ -418,0 +491 @@ export class ApiSessionAgentController {
++    selectedPreset?: string,
+@@ -426 +499,8 @@ export class ApiSessionAgentController {
+-    const composition = await this.composeAgent(this.presetForObservation(observation))
++    let preparedSelection: PreparedAgentPresetSelection | undefined
++    const composition = selectedPreset === undefined
++      ? await this.composeAgent(this.presetForObservation(observation))
++      : {
++        setup: this.selectionSetup(selectedPreset, (selection) => {
++          preparedSelection = selection
++        }),
++      }
+@@ -432 +512 @@ export class ApiSessionAgentController {
+-    return (await this.ctx.agents.resume({
++    const agent = (await this.ctx.agents.resume({
+@@ -436,0 +517,28 @@ export class ApiSessionAgentController {
++    if (selectedPreset !== undefined) {
++      if (preparedSelection === undefined) {
++        throw new Error(`api-session: preset selection setup for session "${sessionId}" produced no commit`)
++      }
++      preparedSelection.commit()
++    }
++    return agent
++  }
++
++  /** Compose a requested selection on the restored unpublished Agent. */
++  private selectionSetup(
++    agentPreset: string,
++    prepared: (selection: PreparedAgentPresetSelection) => void,
++  ): AgentSetup {
++    return async (agentCtx) => {
++      this.installSelection(agentCtx)
++      const agent = agentCtx.agent
++      if (agent === undefined) throw new Error('api-session: Agent setup has no scoped Agent')
++      const presets = this.ctx.get('agentPresets')
++      if (presets === undefined) {
++        throw new TypertRemoteFailure({
++          code: 'internal',
++          message: 'agent preset selection is unavailable: this deployment mounts no agent-presets service',
++          details: {},
++        })
++      }
++      prepared(await presets.prepareSelection(agent, agentPreset))
++    }
+@@ -437,0 +546 @@ export class ApiSessionAgentController {
++  // @meta-intent:end dsh-preset-manager session.agentPresetSelectionActivation
+diff --git a/packages/api/session-controller/src/index.ts b/packages/api/session-controller/src/index.ts
+index 342dd977eb..d79a093f55 100644
+--- a/packages/api/session-controller/src/index.ts
++++ b/packages/api/session-controller/src/index.ts
+@@ -21,0 +22,3 @@ import { installModelSelectionProjection } from './model-selection-projection.ts
++// @meta-intent:begin dsh-preset-manager session.agentPresetSelectionAssemblyImport
++import { SessionAgentPresets } from './preset-selection.ts'
++// @meta-intent:end dsh-preset-manager session.agentPresetSelectionAssemblyImport
+@@ -56,0 +60,3 @@ export { SessionFileReferences } from './file-references.ts'
++// @meta-intent:begin dsh-preset-manager session.agentPresetSelectionAssemblyExport
++export { SessionAgentPresets }
++// @meta-intent:end dsh-preset-manager session.agentPresetSelectionAssemblyExport
+@@ -134,0 +141,3 @@ export class SessionController extends TypertRemoteService {
++    // @meta-intent:begin dsh-preset-manager session.agentPresetSelectionAssemblyMount
++    ctx.plugin(SessionAgentPresets)
++    // @meta-intent:end dsh-preset-manager session.agentPresetSelectionAssemblyMount
+@@ -184,0 +194,12 @@ export class SessionController extends TypertRemoteService {
++  // @meta-intent:begin dsh-preset-manager session.agentPresetSelectionAssemblyMethod
++  /**
++   * Select one blank Session's Agent preset through its activation transaction.
++   * @param sessionId - live or persisted ordinary Session identity.
++   * @param agentPreset - target preset id.
++   * @returns the preset id committed to the Session.
++   */
++  selectAgentPreset(sessionId: SessionId, agentPreset: string): Promise<string> {
++    return this.agents.selectPreset(sessionId, agentPreset)
++  }
++  // @meta-intent:end dsh-preset-manager session.agentPresetSelectionAssemblyMethod
++
+diff --git a/packages/api/session-controller/src/list.ts b/packages/api/session-controller/src/list.ts
+index c9a53a6bd0..69d7e70aa7 100644
+--- a/packages/api/session-controller/src/list.ts
++++ b/packages/api/session-controller/src/list.ts
+@@ -170 +170,3 @@ export class ApiSessionList {
+-    const projections = cached?.values.sessionListMetadata?.blank === false
++    // @meta-intent:begin dsh-preset-manager (purpose: probe bounded cold Sessions when current client projections are incomplete)
++    const projections = cached?.complete !== false
++      && cached?.values.sessionListMetadata?.blank === false
+@@ -172,0 +175 @@ export class ApiSessionList {
++    // @meta-intent:end dsh-preset-manager
+@@ -207 +210,6 @@ export class ApiSessionList {
+-      const block = observation.projections
++      // @meta-intent:begin dsh-preset-manager (purpose: persist bounded cold refolds into the derived projection cache)
++      const cache = this.ctx.get('sessionProjectionCache')
++      const block = observation.source === 'prepared' && cache !== undefined
++        ? cache.coldSnapshot(observation.header, observation.events)
++        : observation.projections
++      // @meta-intent:end dsh-preset-manager
+@@ -331 +339 @@ export class ApiSessionList {
+-  ): SessionProjectionHints | undefined {
++  ): (SessionProjectionHints & { readonly complete?: boolean }) | undefined {
+@@ -338,0 +347,3 @@ export class ApiSessionList {
++          ...'complete' in block && typeof block.complete === 'boolean'
++            ? { complete: block.complete }
++            : {},
+diff --git a/packages/api/session-controller/src/preset-selection.ts b/packages/api/session-controller/src/preset-selection.ts
+new file mode 100644
+index 0000000000..1e23ab0a62
+--- /dev/null
++++ b/packages/api/session-controller/src/preset-selection.ts
+@@ -0,0 +1,37 @@
++// @meta-intent:begin dsh-preset-manager session.agentPresetSelectionRemote
++/** Session-addressed Host adapter for Agent preset selection. */
++
++import { Context } from '@deepseek-ai/cordis'
++import type { SessionId } from '@deepseek-ai/dsh-session'
++import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
++
++declare module '@deepseek-ai/cordis' {
++  interface Context {
++    /** Session-addressed Host adapter for the `agentPresets/select` endpoint. */
++    sessionAgentPresets: SessionAgentPresets
++  }
++}
++
++/** Owns the raw-Session-id `agentPresets/select` Remote endpoint. */
++export class SessionAgentPresets extends TypertRemoteService {
++  static inject = ['sessionController']
++
++  /** @param ctx - Host context carrying the Session Controller. */
++  constructor(ctx: Context) {
++    super(ctx, 'sessionAgentPresets', { namespace: 'agentPresets' })
++  }
++
++  /**
++   * Select a preset through the Session Controller activation transaction.
++   * @param sessionId - live or persisted ordinary Session identity.
++   * @param agentPreset - target preset id.
++   * @returns the preset id committed to the Session.
++   */
++  @Remote('select')
++  select(sessionId: SessionId, agentPreset: string): Promise<string> {
++    return this.ctx.sessionController.selectAgentPreset(sessionId, agentPreset)
++  }
++}
++
++export default SessionAgentPresets
++// @meta-intent:end dsh-preset-manager session.agentPresetSelectionRemote
+diff --git a/packages/api/session-controller/tests/session-cold.host.spec.ts b/packages/api/session-controller/tests/session-cold.host.spec.ts
+index 7156ac569d..6a93d522f8 100644
+--- a/packages/api/session-controller/tests/session-cold.host.spec.ts
++++ b/packages/api/session-controller/tests/session-cold.host.spec.ts
+@@ -73,0 +74 @@ describe('sessions.list cold merge', () => {
++      header('cached-incomplete', 450),
+@@ -98,0 +100,13 @@ describe('sessions.list cold merge', () => {
++      if (id === sid('cached-incomplete')) {
++        return {
++          meta: metas[4]!,
++          events: [
++            { type: 'turn/start', seq: 0, time: 1000, data: { turn: 1 } },
++            {
++              type: 'user/message', seq: 1, time: 1050,
++              data: createUserMessage({ content: [{ type: 'text', text: 'cached' }], source: { kind: 'user' } }),
++              surfaceOp: 'append',
++            },
++          ] as SessionEvent[],
++        }
++      }
+@@ -115 +129 @@ describe('sessions.list cold merge', () => {
+-          return { asOfSeq: 0, values: { sessionListMetadata: { blank: true, lastPromptAt: null } } }
++          return { asOfSeq: 0, complete: true, values: { sessionListMetadata: { blank: true, lastPromptAt: null } } }
+@@ -118 +132 @@ describe('sessions.list cold merge', () => {
+-          return { asOfSeq: 0, values: { sessionListMetadata: { blank: true, lastPromptAt: 900 } } }
++          return { asOfSeq: 0, complete: true, values: { sessionListMetadata: { blank: true, lastPromptAt: 900 } } }
+@@ -121 +135,4 @@ describe('sessions.list cold merge', () => {
+-          return { asOfSeq: 1, values: { sessionListMetadata: { blank: false, lastPromptAt: 1000 } } }
++          return { asOfSeq: 1, complete: true, values: { sessionListMetadata: { blank: false, lastPromptAt: 1000 } } }
++        }
++        if (meta.id === sid('cached-incomplete')) {
++          return { asOfSeq: 1, complete: false, values: { sessionListMetadata: { blank: false, lastPromptAt: 1050 } } }
+@@ -124,0 +142,2 @@ describe('sessions.list cold merge', () => {
++      coldSnapshot: (meta: SessionHeader, events: readonly SessionEvent[]) =>
++        ctx.sessionProjections.restore({}, events, 0, meta).snapshot,
+@@ -137,0 +157 @@ describe('sessions.list cold merge', () => {
++    expect(byId['cached-incomplete']).toMatchObject({ blank: false, updatedAt: 1050 })
+@@ -147 +167 @@ describe('sessions.list cold merge', () => {
+-    expect(inspect).toHaveBeenCalledTimes(3)
++    expect(inspect).toHaveBeenCalledTimes(4)
+@@ -150,0 +171 @@ describe('sessions.list cold merge', () => {
++      sid('cached-incomplete'),
+diff --git a/packages/api/session-controller/tests/session-presets.host.spec.ts b/packages/api/session-controller/tests/session-presets.host.spec.ts
+index 10ce0e4269..3cfd39430e 100644
+--- a/packages/api/session-controller/tests/session-presets.host.spec.ts
++++ b/packages/api/session-controller/tests/session-presets.host.spec.ts
+@@ -11,3 +11,8 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+-import type { Session } from '@deepseek-ai/dsh-session'
+-import { describe, expect, it } from 'vitest'
+-import { createSessionTestRemote } from './test-remote.ts'
++import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
++import { TypertRemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
++import { describe, expect, it, vi } from 'vitest'
++import {
++  createSessionTestController,
++  createSessionTestRemote,
++  testSessionPersistence,
++} from './test-remote.ts'
+@@ -24,0 +30,5 @@ function roster(ids: readonly string[]): unknown {
++  const resolve = (id?: string) => {
++    const wanted = id ?? ids[0] ?? ''
++    if (!ids.includes(wanted)) return Promise.reject(new UnknownPresetError(wanted, ids))
++    return Promise.resolve(presetOf(wanted))
++  }
+@@ -27,5 +37 @@ function roster(ids: readonly string[]): unknown {
+-    resolve: (id?: string) => {
+-      const wanted = id ?? ids[0] ?? ''
+-      if (!ids.includes(wanted)) return Promise.reject(new UnknownPresetError(wanted, ids))
+-      return Promise.resolve(presetOf(wanted))
+-    },
++    resolve,
+@@ -32,0 +39,14 @@ function roster(ids: readonly string[]): unknown {
++    prepareSelection: async (agent: Agent, id: string) => {
++      await resolve(id)
++      return {
++        commit: () => {
++          agent.session.append('agent-preset/selected', { agentPreset: id })
++          return id
++        },
++      }
++    },
++    select: async (agent: Agent, id: string) => {
++      await resolve(id)
++      agent.session.append('agent-preset/selected', { agentPreset: id })
++      return id
++    },
+@@ -167,0 +188,249 @@ describe('session.create Agent preset identity', () => {
++
++describe('cold Session Agent preset selection', () => {
++  it('restores the exact log, binds only the target, commits before publication, and single-flights activation', async () => {
++    const ctx = new Context()
++    await ctx.plugin(SessionStore)
++    await ctx.plugin(AgentRegistry)
++    const sessionId = SessionId('cold-deleted-old-preset')
++    const meta: SessionHeader = {
++      version: 0,
++      id: sessionId,
++      createdAt: 1,
++      cwd: '/project',
++      agentPreset: 'deleted-old',
++    }
++    const events: SessionEvent[] = []
++    const presets = roster(['minimal']) as {
++      resolve(id?: string): Promise<object>
++      prepareSelection(agent: Agent, id: string): Promise<{ commit(): void }>
++      select(agent: Agent, id: string): Promise<string>
++    }
++    const resolve = vi.spyOn(presets, 'resolve')
++    const prepareSelection = vi.spyOn(presets, 'prepareSelection')
++    ctx.provide('agentPresets', presets as never)
++    ctx.provide('sessionPersistence', testSessionPersistence(ctx, {
++      list: () => Promise.resolve([meta]),
++      inspect: () => Promise.resolve({ meta, events }),
++      locate: () => undefined,
++    }) as never)
++    const beforePublication: Array<{ agent: Agent | undefined; session: Session | undefined; selected: unknown }> = []
++    const afterPublication: typeof beforePublication = []
++    const resume = vi.fn<AgentFactory['resume']>(async (_ownerCtx, options) => {
++      const session = ctx.sessions.prepare(sessionId, { meta, seed: events, seedSource: 'persistence' })
++      const agent = stubAgent(session)
++      const agentCtx = ctx.extend({ agent })
++      ;(agent as { ctx?: Context }).ctx = agentCtx
++      await options.setup?.(agentCtx)
++      const selected = (): unknown => session.events.findLast(event => event.type === 'agent-preset/selected')?.data
++      beforePublication.push({ agent: ctx.agents.get(sessionId), session: ctx.sessions.get(sessionId), selected: selected() })
++      ctx.sessions.enter(session)
++      ctx.agents.enter(agent, undefined)
++      afterPublication.push({ agent: ctx.agents.get(sessionId), session: ctx.sessions.get(sessionId), selected: selected() })
++      return { agent, dispose: () => Promise.resolve() }
++    })
++    ctx.agents.setFactory({
++      createAgent: () => Promise.reject(new Error('not used')),
++      resume,
++    })
++    const controller = createSessionTestController(ctx, {
++      defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
++      cwd: '/project',
++    })
++    ctx.sessionProjections.register(agentPresetProjectionDefinition)
++
++    const first = controller.selectAgentPreset(sessionId, 'minimal')
++    const second = controller.selectAgentPreset(sessionId, 'minimal')
++
++    await expect(Promise.all([first, second])).resolves.toEqual(['minimal', 'minimal'])
++    expect(resume).toHaveBeenCalledOnce()
++    expect(prepareSelection).toHaveBeenCalledOnce()
++    expect(resolve).not.toHaveBeenCalled()
++    expect(prepareSelection).toHaveBeenCalledWith(expect.objectContaining({ id: sessionId }), 'minimal')
++    expect(beforePublication).toEqual([{ agent: undefined, session: undefined, selected: undefined }])
++    expect(afterPublication).toEqual([{
++      agent: expect.objectContaining({ id: sessionId }),
++      session: expect.objectContaining({ id: sessionId }),
++      selected: undefined,
++    }])
++    expect(ctx.agents.get(sessionId)).toBeDefined()
++    expect(ctx.sessions.get(sessionId)?.events.filter(event => event.type === 'agent-preset/selected'))
++      .toHaveLength(2)
++  })
++
++  it('preserves a cold target failure without publishing or recording', async () => {
++    const ctx = new Context()
++    await ctx.plugin(SessionStore)
++    await ctx.plugin(AgentRegistry)
++    const sessionId = SessionId('cold-invalid-target')
++    const meta: SessionHeader = {
++      version: 0,
++      id: sessionId,
++      createdAt: 1,
++      cwd: '/project',
++      agentPreset: 'deleted-old',
++    }
++    let unpublished: Agent | undefined
++    ctx.provide('agentPresets', {
++      prepareSelection: (agent: Agent) => {
++        unpublished = agent
++        throw new TypertRemoteFailure({
++          code: 'agent-preset-not-found',
++          message: 'target missing',
++          details: { agentPreset: 'missing', available: ['minimal'] },
++        })
++      },
++    } as never)
++    ctx.provide('sessionPersistence', testSessionPersistence(ctx, {
++      list: () => Promise.resolve([meta]),
++      inspect: () => Promise.resolve({ meta, events: [] }),
++      locate: () => undefined,
++    }) as never)
++    ctx.agents.setFactory({
++      createAgent: () => Promise.reject(new Error('not used')),
++      resume: async (_ownerCtx, options) => {
++        const session = ctx.sessions.prepare(sessionId, { meta, seed: [], seedSource: 'persistence' })
++        const agent = stubAgent(session)
++        const agentCtx = ctx.extend({ agent })
++        ;(agent as { ctx?: Context }).ctx = agentCtx
++        await options.setup?.(agentCtx)
++        throw new Error('unreachable publication')
++      },
++    })
++    const controller = createSessionTestController(ctx, {
++      defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
++      cwd: '/project',
++    })
++
++    await expect(controller.selectAgentPreset(sessionId, 'missing')).rejects.toMatchObject({
++      failure: { code: 'agent-preset-not-found', details: { agentPreset: 'missing' } },
++    })
++    expect(ctx.agents.get(sessionId)).toBeUndefined()
++    expect(ctx.sessions.get(sessionId)).toBeUndefined()
++    expect(unpublished?.session.events.some(event => event.type === 'agent-preset/selected')).toBe(false)
++  })
++
++  it('retries with the requested target after sharing a failed ordinary resume', async () => {
++    const ctx = new Context()
++    await ctx.plugin(SessionStore)
++    await ctx.plugin(AgentRegistry)
++    const sessionId = SessionId('cold-select-after-old-preset-failure')
++    const meta: SessionHeader = {
++      version: 0,
++      id: sessionId,
++      createdAt: 1,
++      cwd: '/project',
++      agentPreset: 'deleted-old',
++    }
++    const oldResolveStarted = Promise.withResolvers<undefined>()
++    const releaseOldResolve = Promise.withResolvers<undefined>()
++    const presets = roster(['minimal']) as ReturnType<typeof roster> & {
++      resolve(id?: string): Promise<object>
++    }
++    const resolve = presets.resolve.bind(presets)
++    presets.resolve = async (id?: string) => {
++      if (id === 'deleted-old') {
++        oldResolveStarted.resolve(undefined)
++        await releaseOldResolve.promise
++        throw new UnknownPresetError(id, ['minimal'])
++      }
++      return await resolve(id)
++    }
++    ctx.provide('agentPresets', presets as never)
++    ctx.provide('sessionPersistence', testSessionPersistence(ctx, {
++      list: () => Promise.resolve([meta]),
++      inspect: () => Promise.resolve({ meta, events: [] }),
++      locate: () => undefined,
++    }) as never)
++    const resume = vi.fn<AgentFactory['resume']>(async (_ownerCtx, options) => {
++      const session = ctx.sessions.prepare(sessionId, { meta, seed: [], seedSource: 'persistence' })
++      const agent = stubAgent(session)
++      const agentCtx = ctx.extend({ agent })
++      ;(agent as { ctx?: Context }).ctx = agentCtx
++      await options.setup?.(agentCtx)
++      ctx.sessions.enter(session)
++      ctx.agents.enter(agent, undefined)
++      return { agent, dispose: () => Promise.resolve() }
++    })
++    ctx.agents.setFactory({ createAgent: () => Promise.reject(new Error('not used')), resume })
++    const controller = createSessionTestController(ctx, {
++      defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
++      cwd: '/project',
++    })
++    ctx.sessionProjections.register(agentPresetProjectionDefinition)
++
++    const ordinaryResume = controller.resolveAgent(sessionId)
++    await oldResolveStarted.promise
++    const selection = controller.selectAgentPreset(sessionId, 'minimal')
++    releaseOldResolve.resolve(undefined)
++
++    await expect(ordinaryResume).resolves.toMatchObject({ error: { code: 'internal' } })
++    await expect(selection).resolves.toBe('minimal')
++    expect(resume).toHaveBeenCalledOnce()
++    expect(ctx.sessions.get(sessionId)?.events.filter(event => event.type === 'agent-preset/selected'))
++      .toEqual([expect.objectContaining({ data: { agentPreset: 'minimal' } })])
++  })
++
++  it('retries a different target after a shared selection-aware resume fails', async () => {
++    const ctx = new Context()
++    await ctx.plugin(SessionStore)
++    await ctx.plugin(AgentRegistry)
++    const sessionId = SessionId('cold-concurrent-selection-targets')
++    const meta: SessionHeader = {
++      version: 0,
++      id: sessionId,
++      createdAt: 1,
++      cwd: '/project',
++      agentPreset: 'deleted-old',
++    }
++    const missingStarted = Promise.withResolvers<undefined>()
++    const releaseMissing = Promise.withResolvers<undefined>()
++    const presets = roster(['minimal']) as ReturnType<typeof roster> & {
++      prepareSelection(agent: Agent, id: string): Promise<{ commit(): string }>
++    }
++    const prepareSelection = presets.prepareSelection.bind(presets)
++    presets.prepareSelection = async (agent, id) => {
++      if (id === 'missing') {
++        missingStarted.resolve(undefined)
++        await releaseMissing.promise
++        throw new TypertRemoteFailure({
++          code: 'agent-preset-not-found',
++          message: 'target missing',
++          details: { agentPreset: id, available: ['minimal'] },
++        })
++      }
++      return await prepareSelection(agent, id)
++    }
++    ctx.provide('agentPresets', presets as never)
++    ctx.provide('sessionPersistence', testSessionPersistence(ctx, {
++      list: () => Promise.resolve([meta]),
++      inspect: () => Promise.resolve({ meta, events: [] }),
++      locate: () => undefined,
++    }) as never)
++    const resume = vi.fn<AgentFactory['resume']>(async (_ownerCtx, options) => {
++      const session = ctx.sessions.prepare(sessionId, { meta, seed: [], seedSource: 'persistence' })
++      const agent = stubAgent(session)
++      const agentCtx = ctx.extend({ agent })
++      ;(agent as { ctx?: Context }).ctx = agentCtx
++      await options.setup?.(agentCtx)
++      ctx.sessions.enter(session)
++      ctx.agents.enter(agent, undefined)
++      return { agent, dispose: () => Promise.resolve() }
++    })
++    ctx.agents.setFactory({ createAgent: () => Promise.reject(new Error('not used')), resume })
++    const controller = createSessionTestController(ctx, {
++      defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
++      cwd: '/project',
++    })
++
++    const missing = controller.selectAgentPreset(sessionId, 'missing')
++    await missingStarted.promise
++    const minimal = controller.selectAgentPreset(sessionId, 'minimal')
++    releaseMissing.resolve(undefined)
++
++    await expect(missing).rejects.toMatchObject({ failure: { code: 'agent-preset-not-found' } })
++    await expect(minimal).resolves.toBe('minimal')
++    expect(resume).toHaveBeenCalledTimes(2)
++    expect(ctx.sessions.get(sessionId)?.events.filter(event => event.type === 'agent-preset/selected'))
++      .toEqual([expect.objectContaining({ data: { agentPreset: 'minimal' } })])
++  })
++})
+diff --git a/packages/api/session-controller/tsconfig.host.json b/packages/api/session-controller/tsconfig.host.json
+index bea21672b7..4725ae5e7c 100644
+--- a/packages/api/session-controller/tsconfig.host.json
++++ b/packages/api/session-controller/tsconfig.host.json
+@@ -20,0 +21 @@
++    "src/preset-selection.ts",
 diff --git a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages/client/ui-workspace/src/client/contract/slots.ts
 index d7f6be2c8a..eb8b1002d9 100644
 --- a/packages/client/ui-workspace/src/client/contract/slots.ts
 +++ b/packages/client/ui-workspace/src/client/contract/slots.ts
-@@ -22,16 +22,24 @@
-  * and a hole has exactly one declaring entry — they carry the same owner
-  * contract and the same occupant.
-  */
+@@ -24,0 +25 @@
 +import type { ReactNode } from 'react'
- import type { ConnectionGenerationState } from '@deepseek-ai/dsh-client-connection/client'
- import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
- // Type-only: pull the owner SlotMap merges into programs that resolve the
- // runtime shares below.
- import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
- import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+@@ -31 +32,3 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 -import type { SessionSearchResultItem } from '@deepseek-ai/dsh-api-session-controller/client'
 +import type {
 +  SessionListState, SessionSearchResultItem,
 +} from '@deepseek-ai/dsh-api-session-controller/client'
- import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+@@ -32,0 +36 @@ import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-
 +import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
- import type { SessionId } from '@deepseek-ai/dsh-session/types'
- import type { createWorkspaceViewStore } from '../stores.ts'
+@@ -34,0 +39,4 @@ import type { createWorkspaceViewStore } from '../stores.ts'
 +import type { SessionNode } from '../tree.ts'
 +import type {
 +  ProjectGroupItemProps, ProjectRowItemProps, SessionNodeItemProps, SessionOverflowButtonProps,
 +} from '../rows/Rows.tsx'
- 
- /**
-  * Owner share of the directory-flow holes: the complete conversation between
-@@ -57,6 +65,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
-     'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
-     /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
-     'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
+@@ -59,0 +68,4 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 +    // @meta-intent:begin dsh-preset-manager (purpose: declare the alternate preset-group occupant contract)
 +    /** Preset-group tree filling the sidebar browsing region's preset mode (declared by the WorkspaceBrowser entry). */
 +    'sidebar.workspaces.presetGroups': { kind: 'single'; scope: 'root'; owner: PresetGroupsOwnerProps }
 +    // @meta-intent:end dsh-preset-manager
-   }
- }
- 
-@@ -82,6 +94,47 @@ export type DirectoryPickingInjected = {
- /** Component-side view of the picking share: the bound occupancy selector hook. */
- export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']>
- 
+@@ -84,0 +97,41 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
 +// @meta-intent:begin dsh-preset-manager (purpose: define the browser-owned row render seats and required session actions)
 +/** Official row authority exposed to an alternate grouping tree. */
 +export interface PresetRowsOwner {
@@ -84,42 +917,22 @@ index d7f6be2c8a..eb8b1002d9 100644
 +}
 +// @meta-intent:end dsh-preset-manager
 +
- /**
-  * Browser-private injected share (arrives via the register inject factory).
-  * Data reads use the global framework hooks; these are the Host actions the
-@@ -142,7 +195,9 @@ export type WorkspaceBrowserInjected = {
- /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */
- export type WorkspaceBrowserProps =
-   PropsRuntime<'sidebar.workspaces'>
+@@ -145 +198,3 @@ export type WorkspaceBrowserProps =
 -  & PropsRenderSlots<'sidebar.workspaces.directoryFlow'>
 +  // @meta-intent:begin dsh-preset-manager (purpose: expose the preset-group render seat to the browser owner)
 +  & PropsRenderSlots<'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.presetGroups'>
 +  // @meta-intent:end dsh-preset-manager
-   & PropsStore<ReturnType<typeof createWorkspaceViewStore>>
-   & Omit<WorkspaceBrowserInjected, 'hooks'>
-   & PropsHooks<WorkspaceBrowserInjected['hooks']>
 diff --git a/packages/client/ui-workspace/src/client/index.ts b/packages/client/ui-workspace/src/client/index.ts
 index f2d1d40336..cd906902e3 100644
 --- a/packages/client/ui-workspace/src/client/index.ts
 +++ b/packages/client/ui-workspace/src/client/index.ts
-@@ -32,9 +32,13 @@ import { en, zh, type WorkspaceKey } from './locales.ts'
- export type { UiWorkspace } from './navigation.ts'
- export type {
-   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
+@@ -34,0 +35 @@ export type {
 +  PresetGroupsOwnerProps, PresetRowsOwner, PresetSessionActions,
-   WorkspaceBrowserInjected, WorkspaceBrowserProps, WorkspacePickerInjected, WorkspacePickerProps,
- } from './contract/slots.ts'
- export type { WorkspaceKey } from './locales.ts'
+@@ -37,0 +39,3 @@ export type { WorkspaceKey } from './locales.ts'
 +// @meta-intent:begin dsh-preset-manager (purpose: publish only row contracts consumed by the alternate grouping occupant)
 +export type { GroupNode, SessionNode } from './tree.ts'
 +// @meta-intent:end dsh-preset-manager
- 
- declare module '@deepseek-ai/dsh-client-ui-slots' {
-   interface GlobalStandardProps {
-@@ -136,7 +140,12 @@ export function apply(ctx: Context): void {
-   ctx.slots.inject('sidebar.workspaces', () => ctx.slots.register(
-     {
-       name: 'sidebar.workspaces',
+@@ -139 +143,6 @@ export function apply(ctx: Context): void {
 -      children: { 'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' } },
 +      children: {
 +        'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
@@ -127,52 +940,31 @@ index f2d1d40336..cd906902e3 100644
 +        'sidebar.workspaces.presetGroups': { kind: 'single', scope: 'root' },
 +        // @meta-intent:end dsh-preset-manager
 +      },
-       store: createWorkspaceViewStore(),
-       inject: browserInjected,
-       locale: NS,
 diff --git a/packages/client/ui-workspace/src/client/locales.ts b/packages/client/ui-workspace/src/client/locales.ts
 index c08fd931de..fc6032255b 100644
 --- a/packages/client/ui-workspace/src/client/locales.ts
 +++ b/packages/client/ui-workspace/src/client/locales.ts
-@@ -10,10 +10,16 @@ export const zh = {
-   'session.new': '新会话',
-   'section.workspaces': '工作区',
-   'section.sessions': '会话',
+@@ -12,0 +13,3 @@ export const zh = {
 +  // @meta-intent:begin dsh-preset-manager (purpose: provide preset grouping labels)
 +  'section.presets': '预设',
 +  // @meta-intent:end dsh-preset-manager
-   'viewOptions.label': '视图选项',
-   'groupBy.label': '分组方式',
-   'groupBy.workspace': '按工作区',
-   'groupBy.flat': '单列表',
+@@ -16,0 +20,3 @@ export const zh = {
 +  // @meta-intent:begin dsh-preset-manager (purpose: provide preset grouping labels)
 +  'groupBy.preset': '按预设',
 +  // @meta-intent:end dsh-preset-manager
-   'orderBy.label': '排序方式',
-   'orderBy.manual': '手动排序',
-   'orderBy.updated': '最近更新',
-@@ -79,10 +85,16 @@ export const en = {
-   'session.new': 'New Session',
-   'section.workspaces': 'Workspaces',
-   'section.sessions': 'Sessions',
+@@ -81,0 +88,3 @@ export const en = {
 +  // @meta-intent:begin dsh-preset-manager (purpose: provide preset grouping labels)
 +  'section.presets': 'Presets',
 +  // @meta-intent:end dsh-preset-manager
-   'viewOptions.label': 'View options',
-   'groupBy.label': 'Group by',
-   'groupBy.workspace': 'WorkSpace',
-   'groupBy.flat': 'In one list',
+@@ -85,0 +95,3 @@ export const en = {
 +  // @meta-intent:begin dsh-preset-manager (purpose: provide preset grouping labels)
 +  'groupBy.preset': 'By preset',
 +  // @meta-intent:end dsh-preset-manager
-   'orderBy.label': 'Order by',
-   'orderBy.manual': 'Manual',
-   'orderBy.updated': 'Last updated',
 diff --git a/packages/client/ui-workspace/src/client/rows/Rows.module.css b/packages/client/ui-workspace/src/client/rows/Rows.module.css
 index 02a99ee5a0..4039977194 100644
 --- a/packages/client/ui-workspace/src/client/rows/Rows.module.css
 +++ b/packages/client/ui-workspace/src/client/rows/Rows.module.css
-@@ -1,3 +1,54 @@
+@@ -0,0 +1,51 @@
 +.projectGroup {
 +  position: relative;
 +}
@@ -224,26 +1016,14 @@ index 02a99ee5a0..4039977194 100644
 +  opacity: 0.55;
 +}
 +
- .projectRow,
- .sessionRow {
-   display: flex;
-@@ -200,6 +251,12 @@
-   color: var(--dsw-alias-label-tertiary);
- }
- 
+@@ -202,0 +254,6 @@
 +.sessionRow .meta {
 +  flex: none;
 +  max-width: 40%;
 +  margin-right: 6px;
 +}
 +
- .time {
-   flex: none;
-   font-size: 12px;
-@@ -336,6 +393,27 @@
-   color: var(--dsw-alias-label-primary);
- }
- 
+@@ -338,0 +396,21 @@
 +.sessionOverflowButton {
 +  width: 100%;
 +  height: 28px;
@@ -265,34 +1045,16 @@ index 02a99ee5a0..4039977194 100644
 +  color: var(--dsw-alias-label-secondary);
 +}
 +
- /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step
-    darker (tertiary, #81858C) per the cell spec. */
- .chevron {
 diff --git a/packages/client/ui-workspace/src/client/rows/Rows.tsx b/packages/client/ui-workspace/src/client/rows/Rows.tsx
 index 012c2d6869..78ab52fc5c 100644
 --- a/packages/client/ui-workspace/src/client/rows/Rows.tsx
 +++ b/packages/client/ui-workspace/src/client/rows/Rows.tsx
-@@ -6,6 +6,7 @@
-  * and workspace hover cards are suppressed while a menu is open.
-  */
- import { useState } from 'react'
+@@ -8,0 +9 @@ import { useState } from 'react'
 +import type { ReactNode } from 'react'
- import clsx from 'clsx'
- import {
-   HoverCard, IconArchiveOutline20, IconBranchOutline16, IconEditOutline16,
-@@ -84,7 +85,7 @@ export interface RowDragProps {
- }
- 
- /** Drag lifecycle owned by a workspace row; its enclosing group owns hit testing. */
+@@ -87 +88 @@ export interface RowDragProps {
 -interface WorkspaceRowDragProps {
 +export interface ProjectRowDragProps {
-   start: () => void
-   end: () => void
- }
-@@ -95,6 +96,68 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
-   return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
- }
- 
+@@ -97,0 +99,62 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 +// @meta-intent:begin dsh-preset-manager (purpose: centralize complete project-group drag geometry in the official row module)
 +/** Whole-project insertion wiring; hit testing spans the header and its visible Sessions. */
 +export interface ProjectGroupDragProps {
@@ -355,13 +1117,7 @@ index 012c2d6869..78ab52fc5c 100644
 +  t: RowTranslate
 +}
 +
- /**
-  * Project (workspace) header row: folder + title;
-  * hover reveals the chevron and create button, and dwelling on a real
-@@ -108,21 +171,13 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
-  * @param props.t - the browser root's locale seat.
-  * @returns the row element.
-  */
+@@ -111,12 +174,4 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 -export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home, t }: {
 -  group: GroupNode
 -  onToggle: () => void
@@ -378,35 +1134,16 @@ index 012c2d6869..78ab52fc5c 100644
 +  group, onToggle, onCreate, actions, drag, home, label: labelOverride,
 +  leading, meta, rowActions, muted = false, t,
 +}: ProjectRowItemProps) {
-   const row = group
-   // The ungrouped bucket has no workspace title: its label is dictionary copy.
+@@ -125 +180 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
 -  const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
 +  const label = labelOverride ?? (row.workspaceId === undefined ? t('group.ungrouped') : row.label)
-   const active = group.expanded && group.containsCurrent
-   const [menuOpen, setMenuOpen] = useState(false)
-   const workspaceMenuItems = [
-@@ -131,7 +186,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
-   ]
-   const ownRow = (
-     <div
+@@ -134 +189 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
 -      className={clsx(css.projectRow, menuOpen && css.menuOpen)}
 +      className={clsx(css.projectRow, menuOpen && css.menuOpen, muted && css.muted)}
-       role="treeitem"
-       aria-expanded={row.expanded}
-       onClick={onToggle}
-@@ -146,7 +201,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
-       onDragEnd={drag?.end}
-     >
-       <span className={clsx(css.slot, css.folder, active && css.folderActive)}>
+@@ -149 +204 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
 -        {row.expanded ? <IconFolderOpen16 /> : <IconFolderClose16 />}
 +        {leading ?? (row.expanded ? <IconFolderOpen16 /> : <IconFolderClose16 />)}
-       </span>
-       <span className={clsx(css.slot, css.chevron)}>
-         <IconTriangleRightFill14 className={clsx(css.arrow, row.expanded && css.arrowOpen)} />
-@@ -154,44 +209,47 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
-       <span className={css.projectText}>
-         <span className={css.title}>{label}</span>
-       </span>
+@@ -157,38 +212,41 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
 -      <span className={css.rowActions}>
 -        {actions !== undefined && (
 -          <Menu
@@ -486,56 +1223,26 @@ index 012c2d6869..78ab52fc5c 100644
 +          </button>}
 +        </>}
 +      </span>}
-     </div>
-   )
-   // The ungrouped bucket has no backing Workspace: no card to show.
-@@ -212,6 +270,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
-     />
-   )
- }
+@@ -214,0 +273 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
 +// @meta-intent:end dsh-preset-manager
- 
- /* v8 ignore next 3 -- closed-union backstop; only reached if the status is forged */
- function assertNever(value: never): never {
-@@ -358,7 +417,9 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
-  * @param props.t - the browser root's locale seat.
-  * @returns the session row.
-  */
+@@ -361 +420,3 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
 -export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
 +// @meta-intent:begin dsh-preset-manager (purpose: extend the official Session row with grouping metadata while retaining all actions)
 +/** Props for the official Session row. */
 +export interface SessionNodeItemProps {
-   node: SessionNode
-   currentId: string | undefined
-   now: number
-@@ -373,8 +434,14 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
-   drag?: RowDragProps | undefined
-   /** The row is rendered without a parent Workspace header. */
-   flat?: boolean | undefined
+@@ -375,0 +437,2 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
 +  /** Grouping-dimension context rendered in the official metadata seat. */
 +  meta?: ReactNode
-   t: RowTranslate
+@@ -377 +440,5 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
 -}) {
 +}
 +
 +export function SessionNodeItem({
 +  node, currentId, now, onOpen, onRename, onFork, onArchive, meta, drag, flat = false, t,
 +}: SessionNodeItemProps) {
-   const row = node
-   const title = displayTitle(node, t)
-   const selected = node.id === currentId
-@@ -441,6 +508,7 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
-           (rename/fork/archive) would all act on content that does not
-           exist — both trailing cells stay off until the first prompt. */}
-       {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
+@@ -443,0 +511 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
 +      {meta !== undefined && <span className={css.meta}>{meta}</span>}
-       {!row.blank && (
-         <span className={css.rowActions}>
-           <Menu
-@@ -481,3 +549,30 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
-     />
-   )
- }
+@@ -483,0 +552,27 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
 +// @meta-intent:end dsh-preset-manager
 +
 +// @meta-intent:begin dsh-preset-manager (purpose: expose the official Session overflow control to alternate groupings)
@@ -567,20 +1274,11 @@ diff --git a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.modul
 index dd9ee488bf..17a8a2dd88 100644
 --- a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.module.css
 +++ b/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.module.css
-@@ -347,8 +347,7 @@
- }
- 
- .flatList > * + *,
+@@ -350,2 +350 @@
 -.searchTree > [role='treeitem'] + [role='treeitem'],
 -.groupSection > * + * {
 +.searchTree > [role='treeitem'] + [role='treeitem'] {
-   margin-top: 2px;
- }
- 
-@@ -364,18 +363,7 @@
-   color: var(--dsw-alias-label-secondary);
- }
- 
+@@ -367,12 +366 @@
 -/* One workspace section: header row + a compact expanded session run. */
 -.groupSection {
 -  position: relative;
@@ -594,13 +1292,7 @@ index dd9ee488bf..17a8a2dd88 100644
 -.workspaceDropBefore::before,
 -.workspaceDropAfter::after {
 +.listTopDropIndicator {
-   content: '';
-   position: absolute;
-   z-index: 1;
-@@ -409,40 +397,6 @@
-   right: var(--dsh-session-list-edge-inset);
- }
- 
+@@ -412,34 +399,0 @@
 -.listTopDropActive > .workspaceDropBefore:first-child::before {
 -  display: none;
 -}
@@ -635,20 +1327,14 @@ index dd9ee488bf..17a8a2dd88 100644
 -  color: var(--dsw-alias-label-secondary);
 -}
 -
- .empty {
-   padding: 16px 12px;
-   color: var(--dsw-alias-label-tertiary);
 diff --git a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
 index c8a5a15740..69fe8e73cc 100644
 --- a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
 +++ b/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
-@@ -20,11 +20,13 @@ import type {
- } from '@deepseek-ai/dsh-api-session-controller/client'
- import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
- import type { SessionId } from '@deepseek-ai/dsh-session/types'
+@@ -23 +23 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 -import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 +import type { PresetRowsOwner, WorkspaceBrowserProps } from '../contract/slots.ts'
- import type { SessionNode, SessionOrderBy } from '../tree.ts'
+@@ -25,3 +25,5 @@ import type { SessionNode, SessionOrderBy } from '../tree.ts'
 -import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from '../tree.ts'
 -import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 -import { FLAT_SESSION_ORDER_KEY } from '../stores.ts'
@@ -657,63 +1343,33 @@ index c8a5a15740..69fe8e73cc 100644
 +  ProjectGroupItem, ProjectRowItem, SearchResultItem, SessionNodeItem, SessionOverflowButton,
 +} from './Rows.tsx'
 +import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
- import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
- import css from './WorkspaceBrowser.module.css'
- 
-@@ -162,9 +164,9 @@ function nextSessionOrderAccount({
- 
- /** Grouping and ordering menu; own open state so it resets with the wide chrome. */
- function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
+@@ -165 +167 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
 -  groupBy: 'workspace' | 'flat'
 +  groupBy: SessionGroupBy
-   orderBy: SessionOrderBy
+@@ -167 +169 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
 -  onGroupPick: (mode: 'workspace' | 'flat') => void
 +  onGroupPick: (mode: SessionGroupBy) => void
-   onOrderPick: (mode: SessionOrderBy) => void
-   t: WorkspaceBrowserProps['t']
- }) {
-@@ -177,6 +179,9 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
-         { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
-         { id: 'workspace', label: t('groupBy.workspace') },
-         { id: 'flat', label: t('groupBy.flat') },
+@@ -179,0 +182,3 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
 +        // @meta-intent:begin dsh-preset-manager (purpose: expose preset grouping in the browser view menu)
 +        { id: 'preset', label: t('groupBy.preset') },
 +        // @meta-intent:end dsh-preset-manager
-         { type: 'separator' as const, id: 'order-by-separator' },
-         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
-         { id: 'manual', label: t('orderBy.manual') },
-@@ -184,7 +189,9 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
-       ]}
-       selectedIds={[groupBy, orderBy]}
-       onSelect={(id) => {
+@@ -187 +192,3 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
 -        if (id === 'workspace' || id === 'flat') onGroupPick(id)
 +        // @meta-intent:begin dsh-preset-manager (purpose: accept preset as a grouping selection)
 +        if (id === 'workspace' || id === 'flat' || id === 'preset') onGroupPick(id)
 +        // @meta-intent:end dsh-preset-manager
-         else if (id === 'manual' || id === 'updated') onOrderPick(id)
-         setOpen(false)
-       }}
-@@ -224,12 +231,6 @@ interface WorkspaceDragState {
-   over: { id: WorkspaceId; half: 'before' | 'after' } | null
- }
- 
+@@ -227,6 +233,0 @@ interface WorkspaceDragState {
 -/** Resolve an insertion side from the full rendered workspace group. */
 -function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' | 'after' {
 -  const rect = e.currentTarget.getBoundingClientRect()
 -  return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
 -}
 -
- type SessionTreeProps = Pick<
-   WorkspaceBrowserProps,
-   'useSessions' | 'useSessionPendingInteraction' | 'startSession' | 'open' | 'forkSession'
-@@ -474,25 +475,17 @@ function SessionTree({
-           // Group section: header row + expanded top-level session rows. The
-           // inter-group breathing room is the section's own margin
-           // (WorkspaceBrowser.module.css).
+@@ -477 +478,2 @@ function SessionTree({
 -            <div
 +            // @meta-intent:begin dsh-preset-manager (purpose: render native Workspace groups through the official group-row authority)
 +            <ProjectGroupItem
-               key={group.key}
+@@ -479,13 +481,2 @@ function SessionTree({
 -              className={clsx(
 -                css.groupSection,
 -                workspaceMarker === 'before' && css.workspaceDropBefore,
@@ -729,7 +1385,7 @@ index c8a5a15740..69fe8e73cc 100644
 -              onDrop={workspaceDrag === null || dropWorkspace === undefined
 +              hideMarker={workspaceDropAtListStart && group === groups[0]}
 +              drag={hoverWorkspace === undefined || dropWorkspace === undefined
-                 ? undefined
+@@ -493,3 +484,5 @@ function SessionTree({
 -                : (e) => {
 -                  e.preventDefault()
 -                  dropWorkspace(workspaceGroupHalf(e))
@@ -738,13 +1394,7 @@ index c8a5a15740..69fe8e73cc 100644
 +                  marker: workspaceMarker,
 +                  hover: hoverWorkspace,
 +                  drop: dropWorkspace,
-                 }}
-             >
-               <ProjectRowItem
-@@ -570,18 +563,15 @@ function SessionTree({
-                 )
-               })}
-               {collapsed.hiddenCount > 0 && (
+@@ -573,10 +566,6 @@ function SessionTree({
 -                <button
 -                  type="button"
 -                  className={css.sessionOverflowButton}
@@ -761,17 +1411,11 @@ index c8a5a15740..69fe8e73cc 100644
 +                  onToggle={() => { setExpandedSessionGroups(keys => toggled(keys, group.key)) }}
 +                  t={t}
 +                />
-               )}
+@@ -584 +573,2 @@ function SessionTree({
 -            </div>
 +            </ProjectGroupItem>
 +            // @meta-intent:end dsh-preset-manager
-           )
-         })}
-       </div>
-@@ -828,6 +818,16 @@ export function WorkspaceBrowser({
-   const workspaces = useWorkspaces(state => state.items)
-   const workspacePhase = useWorkspaces(state => state.phase)
-   const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
+@@ -830,0 +821,10 @@ export function WorkspaceBrowser({
 +  // @meta-intent:begin dsh-preset-manager (purpose: bind official projection and row render seats for alternate grouping occupants)
 +  const presetRows = useMemo<PresetRowsOwner>(() => ({
 +    deriveSessions: deriveFlat,
@@ -782,13 +1426,7 @@ index c8a5a15740..69fe8e73cc 100644
 +    renderSessionOverflow: props => <SessionOverflowButton {...props} t={t} />,
 +  }), [t])
 +  // @meta-intent:end dsh-preset-manager
-   // Live occupancy of this surface's directory-flow hole (the same source the
-   // flow reads): a composition without a picking affordance can add nothing.
-   const directoryFlowAvailable = useDirectoryFlow(occupied => occupied)
-@@ -1072,7 +1072,13 @@ export function WorkspaceBrowser({
-       <div className={css.sectionHeader}>
-         {wide && (
-           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
+@@ -1075 +1075,7 @@ export function WorkspaceBrowser({
 -            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
 +            {/* @meta-intent:begin dsh-preset-manager (purpose: label the active preset grouping mode) */}
 +            {groupBy === 'flat'
@@ -797,13 +1435,7 @@ index c8a5a15740..69fe8e73cc 100644
 +                ? t('section.presets')
 +                : t('section.workspaces')}
 +            {/* @meta-intent:end dsh-preset-manager */}
-           </span>
-         )}
-         {wide && (
-@@ -1201,68 +1207,81 @@ export function WorkspaceBrowser({
-       {/* Always-mounted seat keeps the region's flex slot while the list
-           itself is wide-only. */}
-       <div className={css.listArea}>
+@@ -1204,15 +1210,13 @@ export function WorkspaceBrowser({
 -        {wide && (normalizedQuery !== ''
 -          ? (
 -            <SearchResults
@@ -832,7 +1464,7 @@ index c8a5a15740..69fe8e73cc 100644
 +            },
 +          })
 +          : normalizedQuery !== ''
-             ? (
+@@ -1220,15 +1224 @@ export function WorkspaceBrowser({
 -              <FlatList
 -                useSessions={useSessions} useSessionPendingInteraction={useSessionPendingInteraction}
 -                open={open} forkSession={forkSession}
@@ -849,20 +1481,19 @@ index c8a5a15740..69fe8e73cc 100644
 -            : (
 -              <SessionTree
 +              <SearchResults
-                 useSessions={useSessions}
-                 useSessionPendingInteraction={useSessionPendingInteraction}
+@@ -1237,3 +1227 @@ export function WorkspaceBrowser({
 -                onSessionRename={onSessionRename}
 -                onSessionArchive={onSessionArchive}
 -                forkSession={forkSession}
 +                open={open}
-                 workspaces={workspaces}
+@@ -1241,6 +1228,0 @@ export function WorkspaceBrowser({
 -                groupExpansion={groupExpansion}
 -                setGroupExpanded={actions.setGroupExpanded}
 -                sessionOrderByAccount={sessionOrderByAccount}
 -                sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
 -                syncSessionOrderAccount={actions.syncSessionOrderAccount}
 -                setSessionOrder={actions.setSessionOrder}
-                 archivedSessionIds={archivedSessionIds}
+@@ -1248,6 +1230,3 @@ export function WorkspaceBrowser({
 -                startSession={startSession}
 -                open={open}
 -                insertWorkspaceBefore={insertWorkspaceBefore}
@@ -872,7 +1503,7 @@ index c8a5a15740..69fe8e73cc 100644
 +                query={normalizedQuery}
 +                remote={remoteSearch}
 +                resultLimit={searchResultLimit}
-                 t={t}
+@@ -1255,9 +1233,0 @@ export function WorkspaceBrowser({
 -                onRenameRequest={(workspaceId, currentTitle) => {
 -                  setRenameTarget({ workspaceId, currentTitle })
 -                  setRenameDraft(currentTitle)
@@ -882,7 +1513,7 @@ index c8a5a15740..69fe8e73cc 100644
 -                  setDeleteTarget({ workspaceId, title })
 -                  setDeleteError(null)
 -                }}
-               />
+@@ -1265 +1235,50 @@ export function WorkspaceBrowser({
 -            ))}
 +            )
 +            : groupBy === 'flat'
@@ -934,77 +1565,44 @@ index c8a5a15740..69fe8e73cc 100644
 +                />
 +              ))}
 +        {/* @meta-intent:end dsh-preset-manager */}
-       </div>
- 
-       <Modal
 diff --git a/packages/client/ui-workspace/src/client/stores.ts b/packages/client/ui-workspace/src/client/stores.ts
 index a042f76ff0..d8ada4f0e9 100644
 --- a/packages/client/ui-workspace/src/client/stores.ts
 +++ b/packages/client/ui-workspace/src/client/stores.ts
-@@ -10,8 +10,10 @@ import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-sto
- /** Browser-local order account for the hierarchy-free flat Session list. */
- export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
- 
+@@ -13,2 +13,4 @@ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
 -/** Session-list grouping mode: workspace sections or one flat recency list. */
 -export type SessionGroupBy = 'workspace' | 'flat'
 +// @meta-intent:begin dsh-preset-manager (purpose: add preset grouping to the durable workspace view mode)
 +/** Session-list grouping mode: workspace sections, one flat list, or preset groups. */
 +export type SessionGroupBy = 'workspace' | 'flat' | 'preset'
 +// @meta-intent:end dsh-preset-manager
- /** Session order: user-arranged only, or user-arranged plus activity promotion. */
- export type SessionOrderBy = 'manual' | 'updated'
- 
 diff --git a/packages/client/ui-workspace/tests/browser-styles.client.spec.ts b/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
 index 3d0f31b318..e6dbd41cc5 100644
 --- a/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
 +++ b/packages/client/ui-workspace/tests/browser-styles.client.spec.ts
-@@ -72,13 +72,13 @@ describe('WorkspaceBrowser.module.css list', () => {
-   it('keeps 2px between rows and 4px between workspace groups', () => {
-     expect(declarations('.flatList > * + *')?.get('margin-top')).toBe('2px')
-     expect(declarations(".searchTree > [role='treeitem'] + [role='treeitem']")?.get('margin-top')).toBe('2px')
+@@ -75,2 +75,2 @@ describe('WorkspaceBrowser.module.css list', () => {
 -    expect(declarations('.groupSection > * + *')?.get('margin-top')).toBe('2px')
 -    expect(declarations('.groupSection + .groupSection')?.get('margin-top')).toBe('4px')
 +    expect(rowDeclarations('.projectGroup > * + *')?.get('margin-top')).toBe('2px')
 +    expect(rowDeclarations('.projectGroup + .projectGroup')?.get('margin-top')).toBe('4px')
-   })
- 
-   it('draws drag targets as a leading chevron joined to the insertion line', () => {
-     const listTopMarker = declarations('.listTopDropIndicator')
+@@ -81 +81 @@ describe('WorkspaceBrowser.module.css list', () => {
 -    const workspaceMarker = declarations('.workspaceDropBefore::before')
 +    const workspaceMarker = rowDeclarations('.projectGroup.projectDropBefore::before')
-     const sessionMarker = rowDeclarations('.sessionRow.dropBefore::before')
-     expect(listTopMarker?.get('top')).toBe('-8px')
-     expect(listTopMarker?.get('left')).toBe('0')
-@@ -98,7 +98,7 @@ describe('WorkspaceBrowser.module.css list', () => {
- 
-   it('keeps the compact fade, overflow control, search field, and row heights', () => {
-     expect(declarations('.fade')?.get('height')).toBe('24px')
+@@ -101 +101 @@ describe('WorkspaceBrowser.module.css list', () => {
 -    expect(declarations('.sessionOverflowButton')?.get('height')).toBe('28px')
 +    expect(rowDeclarations('.sessionOverflowButton')?.get('height')).toBe('28px')
-     expect(declarations('.searchExpanded')?.get('height')).toBe('30px')
-     expect(rowDeclarations('.projectRow')?.get('height')).toBe('34px')
-     expect(rowDeclarations('.sessionRow')?.get('height')).toBe('32px')
 diff --git a/packages/client/ui-workspace/tests/rows.client.spec.tsx b/packages/client/ui-workspace/tests/rows.client.spec.tsx
 index b6b0429467..71c17ecc6c 100644
 --- a/packages/client/ui-workspace/tests/rows.client.spec.tsx
 +++ b/packages/client/ui-workspace/tests/rows.client.spec.tsx
-@@ -5,8 +5,10 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/clie
- import type { SessionId } from '@deepseek-ai/dsh-session/types'
- import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
- import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+@@ -8,2 +8,4 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 -import type { RowDragProps } from '../src/client/rows/Rows.tsx'
 -import { ProjectRowItem, SearchResultItem, SessionNodeItem } from '../src/client/rows/Rows.tsx'
 +import type { ProjectGroupDragProps, RowDragProps } from '../src/client/rows/Rows.tsx'
 +import {
 +  ProjectGroupItem, ProjectRowItem, SearchResultItem, SessionNodeItem, SessionOverflowButton,
 +} from '../src/client/rows/Rows.tsx'
- import type { GroupNode, SearchResultNode, SessionNode } from '../src/client/tree.ts'
- import { zh } from '../src/client/locales.ts'
- 
-@@ -128,6 +130,49 @@ describe('workspace browser rows', () => {
-     expect(onToggle).toHaveBeenCalledOnce()
-   })
- 
+@@ -130,0 +133,43 @@ describe('workspace browser rows', () => {
 +  it('renders an alternate grouping through the official group row and overflow seats', () => {
 +    const onToggle = vi.fn()
 +    const onStar = vi.fn()
@@ -1048,56 +1646,29 @@ index b6b0429467..71c17ecc6c 100644
 +    expect(drag.drop).toHaveBeenCalledWith('after')
 +  })
 +
-   it('renders and opens a selected running Session row', () => {
-     const node: SessionNode = {
-       id: sid('session'), title: 'Session', blank: false, running: true,
 diff --git a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
 index 22e4062abe..5c9106f80a 100644
 --- a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
 +++ b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
-@@ -10,7 +10,7 @@ import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-
- import type { SessionId } from '@deepseek-ai/dsh-session/types'
- import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
- import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+@@ -13 +13 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 -import type { WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
 +import type { PresetGroupsOwnerProps, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
- import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
- import { UNGROUPED_KEY } from '../src/client/tree.ts'
- import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
-@@ -86,7 +86,9 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
-     createWorkspace: vi.fn(async () => workspace('created', [])),
-     useDirectoryFlow: bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} }),
-     useConnectionGeneration: selector => selector(undefined),
+@@ -89 +89,3 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
 -    renderSlot: ((_name: string, owner: { open: boolean }) => (owner.open ? <div data-testid="directory-flow" /> : null)) as never,
 +    renderSlot: ((name: string, owner: { open?: boolean }) => name === 'sidebar.workspaces.presetGroups'
 +      ? <div data-testid="preset-groups" />
 +      : owner.open === true ? <div data-testid="directory-flow" /> : null) as never,
-     t,
-     ...overrides,
-   }
-@@ -156,7 +158,7 @@ describe('WorkspaceBrowser', () => {
-     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
-     expect(screen.getByRole('separator')).toBeTruthy()
-     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+@@ -159 +161 @@ describe('WorkspaceBrowser', () => {
 -      '按工作区', '单列表', '手动排序', '最近更新',
 +      '按工作区', '单列表', '按预设', '手动排序', '最近更新',
-     ])
-     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
-     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
-@@ -175,11 +177,46 @@ describe('WorkspaceBrowser', () => {
-     expect(b.store.getSnapshot().groupBy).toBe('workspace')
-     expect(screen.getByText('工作区')).toBeTruthy()
- 
+@@ -177,0 +180,6 @@ describe('WorkspaceBrowser', () => {
 +    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
 +    fireEvent.click(screen.getByRole('menuitem', { name: '按预设' }))
 +    expect(b.store.getSnapshot().groupBy).toBe('preset')
 +    expect(screen.getByText('预设')).toBeTruthy()
 +    expect(screen.getByTestId('preset-groups')).toBeTruthy()
 +
-     // Escape closes the menu without picking.
-     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
-     fireEvent.keyDown(document, { key: 'Escape' })
-     expect(screen.queryByRole('menu')).toBeNull()
+@@ -182 +190,30 @@ describe('WorkspaceBrowser', () => {
 -    expect(b.store.getSnapshot().groupBy).toBe('workspace')
 +    expect(b.store.getSnapshot().groupBy).toBe('preset')
 +  })
@@ -1129,6 +1700,375 @@ index 22e4062abe..5c9106f80a 100644
 +      }),
 +    ])
 +    expect(owner?.sessionActions.onFork).toBe(b.props.forkSession)
-   })
- 
-   it('persists flat-list drag order locally and applies Last updated within that account', async () => {
+diff --git a/packages/preset/agent-presets/README.i18n.yaml b/packages/preset/agent-presets/README.i18n.yaml
+index 0ff1f1d20f..5f3c09a285 100644
+--- a/packages/preset/agent-presets/README.i18n.yaml
++++ b/packages/preset/agent-presets/README.i18n.yaml
+@@ -5,2 +5,2 @@
+-README.md: 5b83ed85a6691dabb6ec340b6462f17d5281efdd
+-README.zh.md: f55f1e383d11b28fa1d8ff52aec1e94a351914f7
++README.md: 9f20bd9a997eda875136b905d0aa2f49a1bd3f0d
++README.zh.md: 58135aa78427699d0530de54a1a03a173bce529a
+diff --git a/packages/preset/agent-presets/README.md b/packages/preset/agent-presets/README.md
+index 5b83ed85a6..9f20bd9a99 100644
+--- a/packages/preset/agent-presets/README.md
++++ b/packages/preset/agent-presets/README.md
+@@ -80,0 +81,2 @@ A session can switch to a different preset only while it has produced nothing
++A persisted blank session can select a target even when its previously recorded preset is absent or broken. The Host restores the exact log, prepares the requested composition on an unpublished Agent, and records `agent-preset/selected` only after Agent publication succeeds. An invalid target, a recorded `turn/start`, or publication failure leaves the durable selection unchanged.
++
+diff --git a/packages/preset/agent-presets/README.zh.md b/packages/preset/agent-presets/README.zh.md
+index f55f1e383d..58135aa784 100644
+--- a/packages/preset/agent-presets/README.zh.md
++++ b/packages/preset/agent-presets/README.zh.md
+@@ -80,0 +81,2 @@ agent-presets:
++即使先前记录的 preset 已缺失或损坏，持久化的空白会话仍可选择目标 preset。Host 会恢复完整日志，在未发布的 Agent 上准备请求的组装，并只在 Agent 发布成功后记录 `agent-preset/selected`。无效目标、已记录的 `turn/start` 或发布失败都不会改变持久化选择。
++
+diff --git a/packages/preset/agent-presets/src/index.ts b/packages/preset/agent-presets/src/index.ts
+index 7dbcefb3d3..9f4386a1c0 100644
+--- a/packages/preset/agent-presets/src/index.ts
++++ b/packages/preset/agent-presets/src/index.ts
+@@ -53,0 +54,6 @@ export const SETTINGS_NAMESPACE = 'agent-presets'
++/** Target composition prepared for a cold Agent and recorded after publication. */
++export interface PreparedAgentPresetSelection {
++  /** Append the durable selection after the Agent publication succeeds. */
++  commit(): string
++}
++
+@@ -688,0 +695,29 @@ export class AgentPresets extends TypertRemoteService {
++  // @meta-intent:begin dsh-preset-manager agentPresets.sessionAddressedSelection
++  /**
++   * Prepare a preset selection while a restored Agent is still unpublished.
++   *
++   * The restored log decides whether the Session is blank. The target preset
++   * is the Agent's first binding in this process; the durable selection is
++   * deferred until the caller confirms Agent publication, so a failed mount
++   * or publication records no selection.
++   * @param agent - unpublished Agent carrying the exact restored Session log.
++   * @param agentPreset - preset to bind before publication.
++   * @returns the synchronous post-publication commit that records the selection.
++   * @throws {TypertRemoteFailure} with the same stable failures as {@link select}.
++   */
++  async prepareSelection(agent: Agent, agentPreset: string): Promise<PreparedAgentPresetSelection> {
++    validatePresetId(agentPreset, 'agentPreset')
++    try {
++      this.assertBlank(agent, agentPreset)
++      const preset = await this.mount(agent.ctx, agentPreset)
++      return {
++        commit: () => {
++          this.commitSelection(agent, preset.id)
++          return preset.id
++        },
++      }
++    } catch (error: unknown) {
++      return rejectPreset(error, agentPreset, `failed to select agent preset "${agentPreset}": ${String(error)}`)
++    }
++  }
++
+@@ -697 +731,0 @@ export class AgentPresets extends TypertRemoteService {
+-  @Remote('select')
+@@ -719,3 +753 @@ export class AgentPresets extends TypertRemoteService {
+-    if (agent.session.events.some(event => event.type === 'turn/start')) {
+-      throw new PresetLockedError(agent.id, agentPreset)
+-    }
++    this.assertBlank(agent, agentPreset)
+@@ -725 +757 @@ export class AgentPresets extends TypertRemoteService {
+-    agent.session.append('agent-preset/selected', { agentPreset: preset.id })
++    this.commitSelection(agent, preset.id)
+@@ -728,0 +761,13 @@ export class AgentPresets extends TypertRemoteService {
++  /** Refuse a composition change after any model-loop turn has started. */
++  private assertBlank(agent: Agent, agentPreset: string): void {
++    if (agent.session.events.some(event => event.type === 'turn/start')) {
++      throw new PresetLockedError(agent.id, agentPreset)
++    }
++  }
++
++  /** Append the durable selection at the composition change's commit point. */
++  private commitSelection(agent: Agent, agentPreset: string): void {
++    agent.session.append('agent-preset/selected', { agentPreset })
++  }
++  // @meta-intent:end dsh-preset-manager agentPresets.sessionAddressedSelection
++
+diff --git a/packages/preset/agent-presets/tests/remote.spec.ts b/packages/preset/agent-presets/tests/remote.spec.ts
+index bd6232e2c8..2bc54a76ec 100644
+--- a/packages/preset/agent-presets/tests/remote.spec.ts
++++ b/packages/preset/agent-presets/tests/remote.spec.ts
+@@ -344,0 +345,56 @@ describe('switching one session\'s composition', () => {
++  it('records a prepared selection only after Agent publication succeeds', async () => {
++    const ctx = await harness()
++    let selection: { commit(): string } | undefined
++
++    const handle = await ctx.agents.create({
++      sessionId: SessionId('sel-unpublished'),
++      setup: async (agentCtx) => {
++        const agent = agentCtx.agent
++        if (agent === undefined) throw new Error('fixture setup has no Agent')
++        selection = await ctx.agentPresets.prepareSelection(agent, 'minimal')
++      },
++    })
++
++    expect(recordedPreset(handle.agent)).toBeUndefined()
++    expect(ctx.agentPresets.composedPreset(handle.agent.ctx)).toBe('minimal')
++    expect(selection?.commit()).toBe('minimal')
++    expect(recordedPreset(handle.agent)).toEqual({ agentPreset: 'minimal' })
++  })
++
++  it('publishes neither identity nor selection when unpublished selection fails', async () => {
++    const ctx = await harness()
++    let unpublished: Agent | undefined
++
++    await expect(ctx.agents.create({
++      sessionId: SessionId('sel-unpublished-failure'),
++      setup: async (agentCtx) => {
++        unpublished = agentCtx.agent
++        if (unpublished === undefined) throw new Error('fixture setup has no Agent')
++        return await ctx.agentPresets.prepareSelection(unpublished, 'nope')
++      },
++    })).rejects.toMatchObject({ failure: { code: 'agent-preset-not-found' } })
++
++    expect(ctx.agents.get(SessionId('sel-unpublished-failure'))).toBeUndefined()
++    expect(ctx.sessions.get(SessionId('sel-unpublished-failure'))).toBeUndefined()
++    expect(unpublished === undefined ? undefined : recordedPreset(unpublished)).toBeUndefined()
++  })
++
++  it('uses the restored unpublished log to enforce the turn lock', async () => {
++    const ctx = await harness()
++    let unpublished: Agent | undefined
++
++    await expect(ctx.agents.create({
++      sessionId: SessionId('sel-unpublished-locked'),
++      setup: async (agentCtx) => {
++        unpublished = agentCtx.agent
++        if (unpublished === undefined) throw new Error('fixture setup has no Agent')
++        unpublished.session.append('turn/start', { turn: 0 })
++        return await ctx.agentPresets.prepareSelection(unpublished, 'minimal')
++      },
++    })).rejects.toMatchObject({ failure: { code: 'agent-preset-locked' } })
++
++    expect(ctx.agents.get(SessionId('sel-unpublished-locked'))).toBeUndefined()
++    expect(ctx.sessions.get(SessionId('sel-unpublished-locked'))).toBeUndefined()
++    expect(unpublished === undefined ? undefined : recordedPreset(unpublished)).toBeUndefined()
++  })
++
+diff --git a/packages/session/session-projection-cache/README.i18n.yaml b/packages/session/session-projection-cache/README.i18n.yaml
+index 59fe21bacf..27d72302ba 100644
+--- a/packages/session/session-projection-cache/README.i18n.yaml
++++ b/packages/session/session-projection-cache/README.i18n.yaml
+@@ -5,2 +5,2 @@
+-README.md: c5e438a2ededef00a1faa456e9913492a603b51d
+-README.zh.md: eab0b81af618558e6f1e5e6bc0c40da3fcc38884
++README.md: f4664f64e71ae38120fb90ef932e95ada10968b1
++README.zh.md: 12e4b1fc12f557620bf404bb9a007ea705088cf9
+diff --git a/packages/session/session-projection-cache/README.md b/packages/session/session-projection-cache/README.md
+index c5e438a2ed..f4664f64e7 100644
+--- a/packages/session/session-projection-cache/README.md
++++ b/packages/session/session-projection-cache/README.md
+@@ -61 +61 @@ Three mandatory points always write: session creation persists the seed-derived
+-`cachedSnapshot(meta)` synchronously serves client values from the storage domain's in-memory tables with zero I/O. It accepts only an identity-matching record and version- and schema-matching keys, then returns a `{ asOfSeq, values }` cut at the lowest served-row watermark. It returns `undefined` for an unknown id, unrelated lifecycle, absent or foreign record document, or no usable rows. `coldSnapshot(meta, events)` accepts a complete ordered log, skips the checkpointed prefix while folding, and refreshes the record without reading the persistence layer itself.
++`cachedSnapshot(meta)` synchronously serves client values from the storage domain's in-memory tables with zero I/O. It accepts only an identity-matching record and version- and schema-matching keys, then returns a `{ asOfSeq, complete, values }` cut at the lowest served-row watermark; `complete` is false when any selected registered client-visible key lacks a usable row. It returns `undefined` for an unknown id, unrelated lifecycle, absent or foreign record document, or no usable rows. `coldSnapshot(meta, events)` accepts a complete ordered log, skips the checkpointed prefix while folding, and schedules a fail-soft record refresh without reading the persistence layer itself.
+@@ -128 +128 @@ These limits define where the cache needs operational care. They are current pac
+-- **No cache-side cold refold** — the cache serves and refreshes its rows but never reads the session log (it does not depend on the persistence layer); a consumer that needs a guaranteed cold snapshot refolds from the log itself.
++- **No cache-owned source read** — the cache serves and refreshes its rows but never reads the session log (it does not depend on the persistence layer); a consumer that needs a guaranteed cold snapshot supplies the complete ordered log to `coldSnapshot`.
+diff --git a/packages/session/session-projection-cache/README.zh.md b/packages/session/session-projection-cache/README.zh.md
+index eab0b81af6..12e4b1fc12 100644
+--- a/packages/session/session-projection-cache/README.zh.md
++++ b/packages/session/session-projection-cache/README.zh.md
+@@ -61 +61 @@ kind: "package-reference"
+-`cachedSnapshot(meta)` 以零 I/O 从存储域的内存表同步提供客户端值。它只接受身份匹配的记录以及版本和 schema 均匹配的 key，再按所服务行的最低水位返回 `{ asOfSeq, values }` 切面。对于未知 id、无关生命周期、缺失或外来的记录文档，或没有可用行的情况，它返回 `undefined`。`coldSnapshot(meta, events)` 接受完整有序日志，在折叠时跳过已检查点化的前缀，并在自身不读取持久化层的情况下刷新记录。
++`cachedSnapshot(meta)` 以零 I/O 从存储域的内存表同步提供客户端值。它只接受身份匹配的记录以及版本和 schema 均匹配的 key，再按所服务行的最低水位返回 `{ asOfSeq, complete, values }` 切面；任何选中的已注册 client-visible key 缺少可用行时，`complete` 为 false。对于未知 id、无关生命周期、缺失或外来的记录文档，或没有可用行的情况，它返回 `undefined`。`coldSnapshot(meta, events)` 接受完整有序日志，在折叠时跳过已检查点化的前缀，并在自身不读取持久化层的情况下调度 fail-soft 记录刷新。
+@@ -128 +128 @@ kind: "package-reference"
+-- **缓存侧不做冷重折叠**——缓存只服务并刷新自己的记录，从不读取会话日志，因为它不依赖持久化层；需要保证冷快照的消费方自行从日志重新折叠。
++- **缓存不拥有来源读取**——缓存只服务并刷新自己的记录，从不读取会话日志，因为它不依赖持久化层；需要保证冷快照的消费方把完整有序日志交给 `coldSnapshot`。
+diff --git a/packages/session/session-projection-cache/src/index.ts b/packages/session/session-projection-cache/src/index.ts
+index c10e85a5b1..f3de6078cf 100644
+--- a/packages/session/session-projection-cache/src/index.ts
++++ b/packages/session/session-projection-cache/src/index.ts
+@@ -54,0 +55,8 @@ export interface Config {
++// @meta-intent:begin dsh-preset-manager (purpose: expose current client projection completeness with cached cuts)
++/** A zero-I/O cached cut plus whether it covers every selected client-visible unit. */
++export interface CachedProjectionSnapshot extends ProjectionSnapshot {
++  /** Whether every selected registered client-visible unit has a usable row. */
++  readonly complete: boolean
++}
++// @meta-intent:end dsh-preset-manager
++
+@@ -131 +139 @@ export class SessionProjectionCache extends Service {
+-  ): ProjectionSnapshot | undefined {
++  ): CachedProjectionSnapshot | undefined {
+@@ -141 +149,7 @@ export class SessionProjectionCache extends Service {
+-    return { asOfSeq, values }
++    // @meta-intent:begin dsh-preset-manager (purpose: carry current client projection completeness to cold-list consumers)
++    return {
++      asOfSeq,
++      complete: this.ctx.sessionProjections.isCheckpointComplete(record.rows, keys),
++      values,
++    }
++    // @meta-intent:end dsh-preset-manager
+@@ -199 +213 @@ export class SessionProjectionCache extends Service {
+-   * the refreshed checkpoint is written back (fail-soft, fire-and-forget), so
++   * the refreshed checkpoint is written back fail-soft, so
+diff --git a/packages/session/session-projection-cache/tests/cache.spec.ts b/packages/session/session-projection-cache/tests/cache.spec.ts
+index 4afccf5a3a..801acade0f 100644
+--- a/packages/session/session-projection-cache/tests/cache.spec.ts
++++ b/packages/session/session-projection-cache/tests/cache.spec.ts
+@@ -36,0 +37 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
++    'cache-test/tags': string[]
+@@ -41,0 +43 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
++    'cache-test/tags': { tags: string[] }
+@@ -67,0 +70,12 @@ const marksUnit = (stateVersion = 1) => ({
++const tagsUnit = () => ({
++  key: 'cache-test/tags',
++  stateSchema: z.array(z.string()),
++  init: () => ['current'],
++  apply: (state: string[]) => state,
++  wire: {
++    viewSchema: z.object({ tags: z.array(z.string()) }),
++    view: tags => ({ tags }),
++  },
++  stateVersion: 1,
++}) satisfies ProjectionDefinition<'cache-test/tags', string[]>
++
+@@ -284 +298,5 @@ describe('SessionProjectionCache listing read', () => {
+-    expect(cache.cachedSnapshot(headerOf(id))).toEqual({ asOfSeq: 4, values: { 'cache-test/marks': { marks: ['t'] } } })
++    expect(cache.cachedSnapshot(headerOf(id))).toEqual({
++      asOfSeq: 4,
++      complete: true,
++      values: { 'cache-test/marks': { marks: ['t'] } },
++    })
+@@ -314,0 +333,29 @@ describe('SessionProjectionCache listing read', () => {
++  it('marks a partial record incomplete and makes its first cold refold immediately reusable', async () => {
++    const root = await mkdtemp(join(tmpdir(), 'dsh-projcache-'))
++    roots.push(root)
++    await seedRecord(root, 'partial', {
++      'cache-test/marks': { ver: 1, seq: -1, val: { marks: ['stored'] } },
++    })
++    const { cache, ctx } = await harness({ root })
++    ctx.sessionProjections.register(tagsUnit())
++    const meta = headerOf(SessionId('partial'))
++
++    expect(cache.cachedSnapshot(meta)).toEqual({
++      asOfSeq: -1,
++      complete: false,
++      values: { 'cache-test/marks': { marks: ['stored'] } },
++    })
++
++    cache.coldSnapshot(meta, [])
++    await settle()
++
++    expect(cache.cachedSnapshot(meta)).toEqual({
++      asOfSeq: -1,
++      complete: true,
++      values: {
++        'cache-test/marks': { marks: ['stored'] },
++        'cache-test/tags': { tags: ['current'] },
++      },
++    })
++  })
++
+diff --git a/packages/session/session-projection/README.i18n.yaml b/packages/session/session-projection/README.i18n.yaml
+index 5ebd76f1fc..ed140423cc 100644
+--- a/packages/session/session-projection/README.i18n.yaml
++++ b/packages/session/session-projection/README.i18n.yaml
+@@ -5,2 +5,2 @@
+-README.md: 95ee09236966c8cbfdaf79cdcb717e04ee0ec367
+-README.zh.md: 0402fbe8e3c56e44f7597bb14fb0379843ecdbca
++README.md: 1289666e05aab9bba81b61acc803f9bd9fa55ca1
++README.zh.md: eacdd367719727431ca272fee204f1c9023a8482
+diff --git a/packages/session/session-projection/README.md b/packages/session/session-projection/README.md
+index 95ee092369..1289666e05 100644
+--- a/packages/session/session-projection/README.md
++++ b/packages/session/session-projection/README.md
+@@ -67 +67 @@ const { asOfSeq, values } = ctx.sessionProjections.snapshot(session)
+-Every unit's state is checkpointed — client-visible and host-only alike — through `checkpoint(session)`, and the sibling [session-projection-cache](../session-projection-cache/README.md) persists those checkpoints so cold reads skip full log loads. `restoreFloor` and `restore` implement the read recipe (cached state plus a forward tail replay) without a live session.
++Every unit's state is checkpointed — client-visible and host-only alike — through `checkpoint(session)`, and the sibling [session-projection-cache](../session-projection-cache/README.md) persists those checkpoints so cold reads skip full log loads. `isCheckpointComplete(checkpoint, keys?)` reports whether every selected registered client-visible unit has a version- and schema-valid row; host-only units do not affect that answer. `restoreFloor` and `restore` implement the read recipe (cached state plus a forward tail replay) without a live session.
+diff --git a/packages/session/session-projection/README.zh.md b/packages/session/session-projection/README.zh.md
+index 0402fbe8e3..eacdd36771 100644
+--- a/packages/session/session-projection/README.zh.md
++++ b/packages/session/session-projection/README.zh.md
+@@ -67 +67 @@ const { asOfSeq, values } = ctx.sessionProjections.snapshot(session)
+-每个单元的状态都会被检查点化——client-visible 与 host-only 一视同仁——通过 `checkpoint(session)`，同级包 [session-projection-cache](../session-projection-cache/README.zh.md) 持久化这些检查点，使冷读跳过全量日志加载。`restoreFloor` 与 `restore` 在无活动会话的情况下实现读取配方（缓存状态加正向尾部回放）。
++每个单元的状态都会被检查点化——client-visible 与 host-only 一视同仁——通过 `checkpoint(session)`，同级包 [session-projection-cache](../session-projection-cache/README.zh.md) 持久化这些检查点，使冷读跳过全量日志加载。`isCheckpointComplete(checkpoint, keys?)` 报告每个选中的已注册 client-visible 单元是否都有版本和 schema 均有效的行；host-only 单元不影响该答案。`restoreFloor` 与 `restore` 在无活动会话的情况下实现读取配方（缓存状态加正向尾部回放）。
+diff --git a/packages/session/session-projection/src/index.ts b/packages/session/session-projection/src/index.ts
+index 2b870d7bef..8850b820e1 100644
+--- a/packages/session/session-projection/src/index.ts
++++ b/packages/session/session-projection/src/index.ts
+@@ -451,0 +452,24 @@ export class SessionProjectionRegistry extends Service {
++  // @meta-intent:begin dsh-preset-manager (purpose: report missing current client projection rows in persisted checkpoints)
++  /**
++   * Report whether a checkpoint contains a usable row for every selected
++   * client-visible unit. Host-only units do not affect client completeness;
++   * an absent, version-mismatched, or malformed selected row is incomplete.
++   * @param checkpoint - persisted rows for one session (possibly stale or empty).
++   * @param keys - optional client-visible keys required by the consumer.
++   * @returns whether every selected registered client-visible unit can be viewed.
++   */
++  isCheckpointComplete(
++    checkpoint: ProjectionCheckpoint,
++    keys?: readonly Extract<keyof SessionProjectionMap, string>[],
++  ): boolean {
++    const values = this.viewCheckpoint(checkpoint, keys)
++    const selected = keys === undefined ? undefined : new Set<string>(keys)
++    for (const registration of this.registrations.values()) {
++      if (registration.def.wire === undefined) continue
++      if (selected !== undefined && !selected.has(registration.def.key)) continue
++      if (!(registration.def.key in values)) return false
++    }
++    return true
++  }
++  // @meta-intent:end dsh-preset-manager
++
+diff --git a/packages/session/session-projection/tests/registry.spec.ts b/packages/session/session-projection/tests/registry.spec.ts
+index d5d99b3cb4..ba96f4e451 100644
+--- a/packages/session/session-projection/tests/registry.spec.ts
++++ b/packages/session/session-projection/tests/registry.spec.ts
+@@ -350,0 +351,19 @@ describe('SessionProjectionRegistry drive', () => {
++  it('reports whether every selected client-visible unit has a usable checkpoint row', async () => {
++    const { ctx } = await harness()
++    ctx.sessionProjections.register(marksUnit())
++    ctx.sessionProjections.register(countUnit())
++
++    expect(ctx.sessionProjections.isCheckpointComplete({})).toBe(false)
++    expect(ctx.sessionProjections.isCheckpointComplete({
++      'test/marks': { ver: 2, seq: 4, val: { marks: ['stale'] } },
++      'test/count': { ver: 1, seq: 4, val: 5 },
++    })).toBe(false)
++    expect(ctx.sessionProjections.isCheckpointComplete({
++      'test/marks': { ver: 1, seq: 4, val: { marks: 'malformed' } },
++    })).toBe(false)
++    expect(ctx.sessionProjections.isCheckpointComplete({
++      'test/marks': { ver: 1, seq: 4, val: { marks: ['stored'] } },
++    })).toBe(true)
++    expect(ctx.sessionProjections.isCheckpointComplete({}, [])).toBe(true)
++  })
++
+diff --git a/packages/subagent/subagent/tests/list-children.spec.ts b/packages/subagent/subagent/tests/list-children.spec.ts
+index 4d6ed421b2..a9eff6c113 100644
+--- a/packages/subagent/subagent/tests/list-children.spec.ts
++++ b/packages/subagent/subagent/tests/list-children.spec.ts
+@@ -522,0 +523 @@ describe('SubagentRuntime.listChildren', () => {
++      complete: true,
+@@ -552,0 +554 @@ describe('SubagentRuntime.listChildren', () => {
++      complete: true,
+@@ -600 +602,5 @@ describe('SubagentRuntime.listChildren', () => {
+-    ctx.sessionProjectionCache.cachedSnapshot = () => ({ asOfSeq: 0, values: { subagent: null } })
++    ctx.sessionProjectionCache.cachedSnapshot = () => ({
++      asOfSeq: 0,
++      complete: true,
++      values: { subagent: null },
++    })
+@@ -897 +903 @@ describe('SubagentRuntime.listChildren', () => {
+-    ctx.sessionProjectionCache.cachedSnapshot = () => ({ asOfSeq: 0, values: {} })
++    ctx.sessionProjectionCache.cachedSnapshot = () => ({ asOfSeq: 0, complete: false, values: {} })
+diff --git a/scripts/gen-cordis-catalog.ts b/scripts/gen-cordis-catalog.ts
+index 1bae81253b..50b5dfb9dd 100644
+--- a/scripts/gen-cordis-catalog.ts
++++ b/scripts/gen-cordis-catalog.ts
+@@ -98,0 +99,3 @@ export const SERVICE_PAGE: Record<string, string> = {
++  // @meta-intent:begin dsh-preset-manager session.agentPresetSelectionCatalogService
++  sessionAgentPresets: 'session.md',
++  // @meta-intent:end dsh-preset-manager session.agentPresetSelectionCatalogService
+@@ -614,0 +618 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
++  CachedProjectionSnapshot: 'session-projection.md',
+@@ -659,0 +664,3 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
++  // @meta-intent:begin dsh-preset-manager agentPresets.preparedSelectionCatalogOwner
++  PreparedAgentPresetSelection: 'cold selection commit is owned by packages/preset/agent-presets/README.md',
++  // @meta-intent:end dsh-preset-manager agentPresets.preparedSelectionCatalogOwner

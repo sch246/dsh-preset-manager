@@ -13,9 +13,9 @@
  *   the only default write entry) — uninstalling the plugin restores the official chip.
  *
  * The default lives in the user layer of the official `agent-presets.default`
- * setting. The ui-settings describe mirror keeps both surfaces and the
- * settings page in sync without adding a second settings reader. Zero new
- * RPCs: roster reads, settings writes, and the official
+ * setting. The ui-settings describe mirror projects default-only changes onto
+ * the held roster; initial load and connection recovery own roster identity
+ * refreshes. Zero new RPCs: roster reads, settings writes, and the official
  * hero stage→apply and preset-group connect→select→open flows are all
  * existing verbs (DESIGN.md §5).
  */
@@ -126,10 +126,10 @@ async function clearDefaultPreset(
 }
 
 /**
- * Roster read + management sequencing. Pure decisions live in roster.ts;
- * this controller only sequences visibility first (when needed), settings
- * second, then re-read (DESIGN.md §4.2) — every path is idempotent because
- * reconcile re-establishes I1/I2 on the echo.
+ * Roster lifecycle, default projection, and management sequencing. Pure
+ * decisions live in roster.ts; this controller reserves full reads and
+ * reconcile for lifecycle refreshes while settings writes and mirror updates
+ * project onto the held roster (DESIGN.md §4.2).
  */
 class RosterController {
   /** Roster snapshot shared by the tree and the shadow chip. */
@@ -148,6 +148,31 @@ class RosterController {
 
   private set(patch: Partial<RosterSnapshot>): void {
     this.store.set({ ...this.store.getSnapshot(), ...patch })
+  }
+
+  /** Project the mirrored user default without invalidating roster identity or managed state. */
+  projectDefault(actions?: PresetManagerBakedActions): void {
+    const settingsSnapshot = this.settings.getSnapshot()
+    if (settingsSnapshot.status === 'idle' || settingsSnapshot.status === 'loading') return
+    const explicitDefaultId = explicitUserDefault(this.settings)
+    const before = this.store.getSnapshot()
+    if (
+      explicitDefaultId !== undefined
+      && before.presets.some(preset => preset.id === explicitDefaultId)
+    ) {
+      // The action is an Immer no-op unless an external settings writer named
+      // a currently hidden preset, so ordinary default changes do not publish
+      // or persist the preset-manager store.
+      actions?.ensureDefaultVisible(explicitDefaultId)
+    }
+    let changed = false
+    const presets = before.presets.map((preset) => {
+      const isDefault = preset.id === explicitDefaultId
+      if (preset.isDefault === isDefault) return preset
+      changed = true
+      return { ...preset, isDefault }
+    })
+    if (changed) this.set({ presets })
   }
 
   /** Read roster and explicit user default, then reconcile the stored order (I1/I2). */
@@ -175,23 +200,21 @@ class RosterController {
     this.set({ status: 'ready', error: null, presets })
   }
 
-  /** Set one visible hero-menu preset as the user default, then re-read the roster. */
-  async setDefault(actions: PresetManagerBakedActions, id: string): Promise<PresetManagerKey | undefined> {
+  /** Set one visible hero-menu preset as the user default. */
+  async setDefault(id: string): Promise<PresetManagerKey | undefined> {
     const { presets } = this.store.getSnapshot()
     if (!presets.some(preset => preset.id === id)) return 'action.failed'
     const failure = await writeDefaultPreset(this.remote, this.settings, id)
     if (failure !== undefined) return 'action.failed'
-    await this.load(actions)
     return undefined
   }
 
   /** Clear the explicit user default without changing the selected preset. */
-  async unsetDefault(actions: PresetManagerBakedActions, id: string): Promise<PresetManagerKey | undefined> {
+  async unsetDefault(id: string): Promise<PresetManagerKey | undefined> {
     const { presets } = this.store.getSnapshot()
     if (!presets.some(preset => preset.id === id && preset.isDefault)) return 'action.failed'
     const failure = await clearDefaultPreset(this.remote, this.settings)
     if (failure !== undefined) return 'action.failed'
-    await this.load(actions)
     return undefined
   }
 
@@ -369,17 +392,20 @@ export function apply(ctx: ClientContext): void {
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-preset-manager: dictionaries')
 
-  ctx.effect(() => {
-    return settings.subscribe(() => {
-      const snapshot = settings.getSnapshot()
-      if (snapshot.status === 'ready' || snapshot.status === 'unavailable') {
-        void controller.load(currentActions)
-      }
-    })
-  }, 'dsh-preset-manager: roster refresh')
+  ctx.effect(() => settings.subscribe(() => {
+    const snapshot = settings.getSnapshot()
+    if (snapshot.status === 'ready' || snapshot.status === 'unavailable') {
+      controller.projectDefault(currentActions)
+    }
+  }), 'dsh-preset-manager: default projection')
+
+  ctx.effect(() => ctx.on('connection/reset', () => {
+    void controller.load(currentActions)
+  }), 'dsh-preset-manager: roster connection refresh')
 
   const treeInjected = (actions: PresetManagerBakedActions): PresetGroupsInjected => {
     currentActions = actions
+    controller.projectDefault(actions)
     return {
       hooks: { roster: controller.store },
       load: () => controller.load(actions),
@@ -431,6 +457,7 @@ export function apply(ctx: ClientContext): void {
       const stop = scope.sessions.list.subscribe(() => { void seatCtl.apply() })
       const seatInjected = (actions: PresetManagerBakedActions): SeatChipInjected => {
         currentActions = actions
+        controller.projectDefault(actions)
         return {
           hooks: { seat: seatCtl.store, roster: controller.store },
           load: () => controller.load(actions),
@@ -438,11 +465,11 @@ export function apply(ctx: ClientContext): void {
           select: (id: string) => seatCtl.select(id),
           setDefault: (id) => {
             seatCtl.retainSelection(id)
-            return controller.setDefault(actions, id)
+            return controller.setDefault(id)
           },
           unsetDefault: (id) => {
             seatCtl.retainSelection(id)
-            return controller.unsetDefault(actions, id)
+            return controller.unsetDefault(id)
           },
         }
       }

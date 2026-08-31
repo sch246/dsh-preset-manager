@@ -22,6 +22,8 @@ export type PresetManagerActions = {
   setHidden: (draft: PresetManagerState, hidden: string[]) => void
   /** Fold order/visibility against the roster and migrate old v1 snapshots. */
   reconcileState: (draft: PresetManagerState, presets: readonly { id: string; isDefault: boolean }[]) => void
+  /** Remove the explicit user default from hidden when an external settings write names it. */
+  ensureDefaultVisible: (draft: PresetManagerState, id: string) => void
   /** Merge one rename override (display name/description only). */
   setOverride: (draft: PresetManagerState, id: string, override: { name?: string; description?: string }) => void
 }
@@ -58,6 +60,10 @@ export function createPresetManagerStore(): EngineStoreHandle<PresetManagerState
         if (d.overrides === undefined || d.overrides === null || Array.isArray(d.overrides)) {
           d.overrides = {}
         }
+      },
+      ensureDefaultVisible: (d, id) => {
+        if (!Array.isArray(d.hidden) || !d.hidden.includes(id)) return
+        d.hidden = d.hidden.filter(existing => existing !== id)
       },
       setOverride: (d, id, override) => {
         if (d.overrides === undefined || d.overrides === null || Array.isArray(d.overrides)) {

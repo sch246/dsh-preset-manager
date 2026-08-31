@@ -51,7 +51,7 @@ bash scripts/setup.sh              # 见下：补丁 + 重建 + 注册 bundle
 - **⋯ → 重命名** 改显示名与说明（说明支持多行）；**⋯ → 隐藏** 后新会话选择器不再出现该预设（组行置灰保留入口，切换视图/重载后仍保持；取消隐藏恢复原位置；默认预设的隐藏会被拒绝）；
 - 新会话界面的预设选择器由本插件接管：只显示可见健康预设，沿用侧栏 managed order 与覆盖名，并标出 settings user 层的显式默认。初次打开依次选择显式默认、当前或复用 Session 的最近预设、列表第一项；页面内手动选择不被后续异步默认刷新覆盖；
 - 点击其他项只切换当前预设。重复点击当前非默认项会“设为默认”，重复点击当前显式默认项会“取消默认”并保留当前选择；两种 settings 写入失败都会在选择器旁保持可见；卸载即恢复官方选择器；
-- 官方设置页里改显式用户默认会与本列表自动互同步；若目标被隐藏会只取消隐藏、不移动位置。Host roster 的部署 fallback 不会显示成用户默认。
+- 官方设置页里改显式用户默认会与本列表自动互同步；默认变化只更新当前名单的标记，不重新读取名单或让分组树进入 loading。若目标被隐藏会只取消隐藏、不移动位置。Host roster 的部署 fallback 不会显示成用户默认。
 
 ## 目录结构
 
@@ -79,7 +79,7 @@ dsh-preset-manager/
 - **历史分组按完整投影恢复**：列表识别缺少当前 client-visible 行的旧投影缓存，在配置的物理大小上限内从完整 Session 日志重折叠并回写派生缓存；部署迁移临时扩大该上限，完成后恢复默认值，权威会话日志不被改写。
 - **冷 Session 直接按目标 preset 激活**：Host 的 `agentPresets/select` 接受原始 Session id；已有空白 Agent 原地切换，冷空白 Session 在目标 preset 下恢复，完整发布成功后才记录选择。旧 preset 已删除或损坏不会阻止选择可用目标；目标无效、会话已开始或发布失败都不留下选择事件。
 - **完整顺序 + hidden + 显式用户默认的不变量**：`order` 保存全部预设的稳定顺序，`hidden` 独立保存隐藏集合，reconcile 强制 settings user 层 `default ∉ hidden`；无显式默认且全部隐藏时官方 default 被 unset。显式 schema/initialized 区分首次安装、旧 v1 和后续新增；selector 与 sidebar 共享 managed order，尚未 reconcile 的 Host 新增项只在末尾尾随。
-- **复用官方 settings 与 RPC**：名单读 `agentPresets.list`；显式默认从 ui-settings 唯一 layered describe mirror 的 `user.default` 读取，写入走官方 `settings.update` / `settings.mutate`。预设组的新会话先用 `uiWorkspace.connectWorkspace` 解析或创建空白会话，再对该会话执行 `agentPresets.select(sessionId, presetId)`，成功后才由 `sessions.open` 打开。Host patch 只把既有 `select` endpoint 的身份解析移到 Session Controller，没有增加 wire 方法。列表与名字覆盖是本插件本地数据（`dsh.presetManager.v1`）。
+- **复用官方 settings 与 RPC**：初始加载、失败重试和 connection recovery 通过 `agentPresets.list` 读取名单；显式默认从 ui-settings 唯一 layered describe mirror 的 `user.default` 读取，写入走官方 `settings.update` / `settings.mutate`。写成功返回的完整 namespace view 和外部 mirror 更新都只投影到当前名单；默认标记不变时不发布 roster，普通默认变化不写 preset-manager localStorage。预设组的新会话先用 `uiWorkspace.connectWorkspace` 解析或创建空白会话，再对该会话执行 `agentPresets.select(sessionId, presetId)`，成功后才由 `sessions.open` 打开。Host patch 只把既有 `select` endpoint 的身份解析移到 Session Controller，没有增加 wire 方法。列表与名字覆盖是本插件本地数据（`dsh.presetManager.v1`）。
 - **shadow 接管选择器**：以更低 priority 注册进 `conversation.hero.agentPreset`（single slot 的合法 shadow），卸载即恢复官方 chip。
 
 ## 验证

@@ -21,6 +21,8 @@ export type PresetManagerActions = {
         id: string;
         isDefault: boolean;
     }[]) => void;
+    /** Remove the explicit user default from hidden when an external settings write names it. */
+    ensureDefaultVisible: (draft: PresetManagerState, id: string) => void;
     /** Merge one rename override (display name/description only). */
     setOverride: (draft: PresetManagerState, id: string, override: {
         name?: string;

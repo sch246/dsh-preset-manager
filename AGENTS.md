@@ -20,7 +20,7 @@
 - **RPC 表封闭**、`sidebar.workspaces` single slot 被官方浏览器占据：不新增 RPC、不替换官方浏览器；补丁只加扩展点，shadow 只用于 `conversation.hero.agentPreset`（priority -1，卸载即恢复）。
 - **Workspace 行是唯一呈现权威**：插件通过 owner contract 消费官方 Session 投影、行渲染回调和必需的重命名／分叉／归档动作，只提供说明、预设操作和项目标识；禁止运行时导入 ui-workspace 组件、复制行 CSS、重写状态点／菜单／折叠／溢出／拖拽命中规则。跨包只允许类型导入。
 - **完整顺序 + hidden + 显式用户默认**：`order` 是全部现存预设的稳定顺序，`hidden` 是独立可见性集合，官方 settings 的 user 层 default 是独立权威；部署 fallback 不冒充用户选择。显式 `schemaVersion + initialized` 区分首次安装、旧 v1 升级与日后新增。`default ∉ hidden`（I1）、新增/删除由 reconcile 合入完整顺序（I2）、无默认且全部隐藏时 unset 默认（I3）。不得再用空 order 或“不在 order”猜安装状态，也不得引入第二条顺序或可见性写链。
-- 默认的权威拷贝在官方 settings user 层（host 持久）；列表与名字覆盖是插件本地 store（历史 key `dsh.presetManager.v1`，当前 schema v2）。开始聊天页是唯一默认写入口：再次选择当前非默认项写 `settings.default`，再次选择当前显式默认项清除它并保留本次选择，侧栏不提供默认控件；无显式默认时依次使用最近 Session 预设和 managed order 第一项。
+- 默认的权威拷贝在官方 settings user 层（host 持久）；列表与名字覆盖是插件本地 store（历史 key `dsh.presetManager.v1`，当前 schema v2）。开始聊天页是唯一默认写入口：再次选择当前非默认项写 `settings.default`，再次选择当前显式默认项清除它并保留本次选择，侧栏不提供默认控件；无显式默认时依次使用最近 Session 预设和 managed order 第一项。默认写响应和 settings mirror 更新只投影当前 roster 的默认标记；除外部默认指向 hidden 时精确取消该 hidden 外，不得读取名单、发布 loading、reconcile order/hidden 或改写本地 store。初始加载、失败重试与 `connection/reset` 才刷新 roster 生命周期。
 
 ## 代码纪律
 

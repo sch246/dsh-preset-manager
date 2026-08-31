@@ -13,9 +13,9 @@
  *   the only default write entry) — uninstalling the plugin restores the official chip.
  *
  * The default lives in the user layer of the official `agent-presets.default`
- * setting. The ui-settings describe mirror keeps both surfaces and the
- * settings page in sync without adding a second settings reader. Zero new
- * RPCs: roster reads, settings writes, and the official
+ * setting. The ui-settings describe mirror projects default-only changes onto
+ * the held roster; initial load and connection recovery own roster identity
+ * refreshes. Zero new RPCs: roster reads, settings writes, and the official
  * hero stage→apply and preset-group connect→select→open flows are all
  * existing verbs (DESIGN.md §5).
  */

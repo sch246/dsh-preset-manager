@@ -133,13 +133,14 @@ Harness store 会用 localStorage JSON **整体替换** `init()` 结果，没有
 - **I2 完整顺序跟随 roster**：`order` 恰含全部现存预设；新预设追加且默认可见，删除项同时从 `order` 与 `hidden` 清理。
 - **I3 无默认且全部隐藏**：官方 default 被 **unset**（`settings.mutate`），新会话回落到部署默认。有默认时 I1 阻止它进入 hidden。
 
-### 4.2 reconcile（每次 load / `settings/document-updated` / 本插件写后回读）
+### 4.2 roster 生命周期 reconcile 与默认投影
 
-1. 先按 schema/initialized 区分首次安装、旧快照和当前状态；首次安装导入全部现有预设为可见；
-2. `order := order ∩ 现存预设 id`；新 id 追加到末尾；`hidden` 同步清除不存在 id；
-3. 若 settings user 层 default 指向 hidden 预设：只从 `hidden` 移除，保留 `order` 位置；
-4. 若显式 default 指向的预设被删除：Host 清除该 user 字段，Client 投影不把部署 fallback 标为显式默认；
-5. 本插件写操作先改 `hidden`（必要时），再写 settings（`update default` / `mutate unset`）；事件回读后 I1–I3 已成立，幂等。
+1. 初始加载、失败重试与 `connection/reset` 并行读取 Host roster、等待共享 settings layered describe，按 schema/initialized 区分首次安装、旧快照和当前状态；首次安装导入全部现有预设为可见；
+2. roster 生命周期 reconcile 执行 `order := order ∩ 现存预设 id`，把新 id 追加到末尾，并从 `hidden` 清除不存在 id；
+3. settings mirror 的 default-only 更新不读取 Host roster、不发布 loading，也不执行 roster 生命周期 reconcile；它只比较当前 `isDefault` 投影，实际变化时发布一次 roster snapshot；
+4. 若 settings user 层 default 指向当前 hidden 预设，只从 `hidden` 移除并保留 `order` 位置；普通默认变化不发布或持久化 preset-manager store；
+5. 若显式 default 指向的预设被删除，Host 清除该 user 字段，Client 投影不把部署 fallback 标为显式默认；
+6. 本插件写 settings（`update default` / `mutate unset`）后把返回的完整 namespace view 折入共享 mirror；同一 default-only 投影路径处理响应，不另行 load。
 
 ### 4.3 派生（纯函数，单一投影）
 
@@ -161,10 +162,10 @@ derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组
 
 | 动作 | RPC / 通道 | 说明 |
 |---|---|---|
-| 读名单与显式默认 | `agentPresets.list()` + `settingsScope.describe()` | 共享 settings mirror 完成 layered describe 后，读取 `user.default` 并覆盖 roster fallback 标记，再原子发布 |
+| roster 生命周期读取 | `agentPresets.list()` + `settingsScope.describe()` | 初始加载、失败重试与 `connection/reset` 读取名单；共享 settings mirror 完成 layered describe 后，读取 `user.default` 并覆盖 roster fallback 标记，再原子发布 |
 | 写默认 | `settings.update({ ns:'agent-presets', patch:{ default: id } })` | hero 菜单再次选择当前非默认项 |
 | 清默认 | `settings.mutate({ ns:'agent-presets', ops:[{ op:'unset', path:['default'] }] })` | hero 菜单再次选择当前显式默认项；I3 也复用此写入 |
-| 默认被外部改 | `settingsScope.describe().subscribe()` → reconcile | ui-settings 持有唯一 describe reader；官方设置页与插件互相同步 |
+| 默认被外部改 | `settingsScope.describe().subscribe()` → 当前 roster 默认投影 | ui-settings 持有唯一 describe reader；不读名单、不发布 loading、不 reconcile order；目标 hidden 时只取消该 hidden |
 | 开新会话（+） | `uiWorkspace.connectWorkspace(target)` → `agentPresets.select(sessionId, presetId)` → `sessions.open(sessionId)` | connect 统一复用或创建空白会话；select 成功并记录预设后才打开，失败留在当前界面并显示提示；Host patch 保留 wire 方法并改为按原始 Session id 激活 |
 | 打开会话 | `ctx.sessions.open(id)` | 现有服务动词 |
 | 排序/隐藏/改名 | 无 RPC，落 §4.1 的本地 store | 显示层数据 |
@@ -176,7 +177,7 @@ derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组
 ```
 src/client/
 ├── index.ts            # apply：store 工厂 + roster/seat 控制器 + presetGroups 注册 + shadow SeatChip
-├── stores.ts           # createPresetManagerStore + actions（setOrder/reconcileOrder/setOverride）
+├── stores.ts           # createPresetManagerStore + actions（setOrder/reconcileState/ensureDefaultVisible/setOverride）
 ├── roster.ts           # deriveRoster / derivePresetGroups / reconcile / planHide…（纯函数）
 ├── locales.ts          # presetManager 命名空间字典（zh/en）
 ├── styles.ts           # 仅插件装饰的内联 CSS（不复制官方行布局）
@@ -200,15 +201,15 @@ src/client/
 | 全部隐藏 | 仅无默认时可能；`order` 仍完整 | `mutate unset default` |
 | 拖拽组行 | `order` 重排（与默认无关） | 无 |
 | 重命名 | `overrides` 更新 | 无 |
-| 外部改默认 | reconcile：若目标被隐藏则只取消 hidden | 已成立 |
+| 外部改默认 | 当前 roster 只更新默认投影；若目标被隐藏则精确取消该 hidden | 已成立 |
 | 外部新建预设 | reconcile：追加到末尾（可见） | 无 |
 
 隐藏组行“置灰 + 排到显示末尾”只是展示规则；完整 `order` 始终保留隐藏项的位置，因此取消隐藏会回到原处。默认、顺序、可见性三者互相解耦。
 
 ## 7. 关键流程
 
-1. **启动/刷新**：并行读取 roster 并等待共享 settings layered describe → 用 `user.default` 投影显式默认 → 原子 reconcile 生命周期与 I1/I2 → 发布 ready；选择器在显式默认、最近 Session、managed order 第一项之间完成初始选择，未就绪时不显示错误 fallback。
-2. **默认切换**：先判断点击项是否不同于当前项；不同项只切换当前预设。重复点击当前非默认项写 `settings.default`，重复点击当前显式默认项清除该字段并保持当前选择；写入失败显示提示，异步 mirror 刷新不覆盖页面内手动选择。
+1. **启动/刷新**：初始加载与 connection recovery 并行读取 roster 并等待共享 settings layered describe → 用 `user.default` 投影显式默认 → 原子 reconcile 生命周期与 I1/I2 → 发布 ready；选择器在显式默认、最近 Session、managed order 第一项之间完成初始选择，未就绪时不显示错误 fallback。
+2. **默认切换**：先判断点击项是否不同于当前项；不同项只切换当前预设。重复点击当前非默认项写 `settings.default`，重复点击当前显式默认项清除该字段并保持当前选择；成功响应的完整 namespace view 直接折入 mirror，只在默认标记实际变化时发布当前 roster，不读取名单、不进入 loading、不 reconcile 本地状态。写入失败显示提示，异步 mirror 刷新不覆盖页面内手动选择。
 3. **隐藏**：加入 `hidden`、不改 `order` → 组行**置灰并固定在显示列表末尾** → shadow chip 不再出现；切换视图或 reload 后保持，取消隐藏恢复原位置；默认预设的隐藏被拒绝。
 4. **以预设开始新会话**：见 §5（connect 解析或创建空白会话 → 在该 id 上 select → 成功后 open，落到准备开始界面；普通 hero 选择仍使用 stage→apply）。
 5. **重命名**：对话框写 `overrides`；不改 id、不写 `preset.yml`。

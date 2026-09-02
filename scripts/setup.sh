@@ -98,7 +98,7 @@ regenerate_shared_catalogs
   echo "patch_applied_by_setup=$PATCH_APPLIED_BY_SETUP"
   echo "host_head=$(git -C "$CHECKOUT" rev-parse HEAD)"
   echo "marker_schema=meta-intent-source-region/0.1"
-  echo "regions=sidebar.workspaces.presetGroups,workspace.rows.alternateGrouping,workspace.rows.projectExtension,workspace.rows.sessionMetadata,workspace.rows.presetOwner,workspace.groupBy.preset,session.list.backfillIncompleteProjections,sessionProjection.checkpointCompleteness,sessionProjectionCache.completeSnapshot,session.agentPresetSelection,session.agentPresetSelectionAssembly,session.agentPresetSelectionRemote,session.agentPresetSelectionCatalog,agentPresets.sessionAddressedSelection"
+  echo "regions=sidebar.workspaces.presetGroups,workspace.rows.alternateGrouping,workspace.rows.projectExtension,workspace.rows.sessionMetadata,workspace.rows.presetOwner,workspace.groupBy.preset,workspace.orderBy.refresh,session.list.backfillIncompleteProjections,sessionProjection.checkpointCompleteness,sessionProjectionCache.completeSnapshot,session.agentPresetSelection,session.agentPresetSelectionAssembly,session.agentPresetSelectionRemote,session.agentPresetSelectionCatalog,agentPresets.sessionAddressedSelection"
   echo "generators=pnpm run gen-client-catalog|pnpm run gen-cordis-api"
   echo "generated_catalogs=packages/extensions/cordis-client-runner/src/client/slot-catalog.ts,packages/extensions/tool-cordis/src/api-catalog.ts,docs/subsystems/session-projection.md,docs/subsystems/session-projection.zh.md,docs/subsystems/session-projection.i18n.yaml"
 } > "$STATE_FILE"

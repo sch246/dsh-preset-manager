@@ -626,6 +626,14 @@ index a042f76ff0..9f6ce231eb 100644
 +/** Session-list grouping mode: workspace sections, one flat list, or the preset extension seat. */
 +export type SessionGroupBy = 'workspace' | 'flat' | 'preset'
 +// @meta-intent:end dsh-preset-manager workspace.groupBy.preset
+@@ -64 +66,6 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
+-      setOrderBy: (d, mode: SessionOrderBy) => { d.orderBy = mode },
++      // @meta-intent:begin dsh-preset-manager workspace.orderBy.refresh
++      setOrderBy: (d, mode: SessionOrderBy) => {
++        d.orderBy = mode
++        if (mode === 'updated') d.sessionUpdatedAtByAccount = {}
++      },
++      // @meta-intent:end dsh-preset-manager workspace.orderBy.refresh
 diff --git a/packages/preset/agent-presets/README.i18n.yaml b/packages/preset/agent-presets/README.i18n.yaml
 index 7e482db6c2..7b7509ea1d 100644
 --- a/packages/preset/agent-presets/README.i18n.yaml

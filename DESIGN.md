@@ -153,7 +153,7 @@ derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组
 
 - 显示名 = `overrides[id].name ?? preset.name ?? id`；
 - selector 与 sidebar 消费同一 managed order；尚未来得及 reconcile 的 Host 新增项按 Host 顺序尾随；
-- 组内会话按 `updatedAt` 倒序（v1 无组内拖拽）；
+- 组内会话按 `updatedAt` 倒序（v1 无组内拖拽）；选择或重选“最近更新”都以当前会话集重新计算顺序，避免恢复部署后沿用旧的浏览器排序快照；
 - 组树布局：可见预设组按 `order` 的可见子序列 → 隐藏预设组（置灰、不可拖拽、固定排在所有可见组之后，内部仍按完整 `order`）→ “未分组”兜底组最后；
 - Session 可见性与状态直接消费 ui-workspace 的官方投影（非 subagent、未归档、blank 仅当前、运行子代理与待交互状态），本插件不重建 `deriveFlat`；
 - `query`（浏览器搜索态）在 preset 模式下交给组树做标题过滤：组标题或组内会话标题匹配则保留组，非空时组内会话行同步过滤。

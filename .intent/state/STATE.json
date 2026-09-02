@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.24",
+  "revision": "0.1.0-draft.25",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -25,7 +25,8 @@
     "../logs/2026-08-31-cold-preset-selection-lookup-mismatch.md",
     "../logs/2026-08-31-session-row-metadata-order.md",
     "../logs/2026-08-31-default-write-refresh-scope.md",
-    "../logs/2026-09-01-target-drift-and-recomposition.md"
+    "../logs/2026-09-01-target-drift-and-recomposition.md",
+    "../logs/2026-09-01-restored-session-order-snapshot.md"
   ],
   "protocol": {
     "id": "meta-intent",

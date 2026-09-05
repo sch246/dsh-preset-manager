@@ -5,7 +5,7 @@
 ## 意图包入口
 
 - 本仓库的语义包位于 `.intent/`：先读 `.intent/state/STATE.json`、`.intent/state/STATE.md`，再按其中选择的协议解释 `logs/` 与 `locks/`。
-- 当前 state 是从设计、实现和 Git 历史反向重构的 draft；没有发现用户逐字原话。不得把现有代码、`DESIGN.md` 或运行结果静默提升为用户确认。
+- 当前 STATE 保留重构来源、后来补入的用户原话与后续反馈；入口见 [STATE](.intent/state/STATE.md) 和 [用户原话](.intent/logs/2026-08-26-user-original-intent.md)。不得把代码、`DESIGN.md` 或运行结果静默提升为用户确认。
 - `.intent/logs/` 保存来源调查与后续 authority event；`.intent/state/` 是当前语义投影；`.intent/locks/` 只保存或引用已提交、可核验的具体实现。工作树未提交时不得伪造 reference-backed lock。
 
 ## 装配模型
@@ -13,7 +13,7 @@
 - 本包是**双面 bundle 插件**：`cordis.patch.yml` 身份行（节点半身 = identity apply）+ `dsh.client`（浏览器半身）。
 - **补丁路线**：`patches/harness-groupby-preset.patch` 增加 ui-workspace preset 分组席位，并让 session projection cache 向列表报告和有界回填缺失的当前客户端投影。具体落点随目标 harness 版本演进；改补丁必须同步 DESIGN.md §3.1、`patches/README.md` 与 README。
 - 装配：`scripts/setup.sh`（`git apply --check` → apply → 重生成共享 catalog → 构建 Host 与 ui-workspace → 构建本插件 → `dsh plugin add`）；`lib/` 与静态补丁提交进 git，共享生成物不由补丁独占。
-- 一切改动必须过 `bash scripts/build.sh`（DSH_CHECKOUT 指向 dsh 源码 checkout）。
+- 运行时与构建改动执行 `bash scripts/build.sh`（DSH_CHECKOUT 指向所选 dsh checkout）；纯地图/文档改动检查引用、JSON 和 diff，不为此重建或安装插件。
 
 ## 约束（为什么这么设计）
 
@@ -29,7 +29,7 @@
 - 插件自有装饰样式只有 `src/client/styles.ts` 一个来源：字符串常量 + 首执行注入 `<style>`；只用 `--dsw-*` token 与语义别名，不写字面量颜色，也不覆盖官方行布局。
 - 产品文案中文，注释英文；对外承诺（RPC 用法、已知限制）改完必须同步 `DESIGN.md` / `README.md`。
 
-## 检查清单（提交前）
+## 运行时改动检查（提交前）
 
 ```bash
 npm run typecheck   # host + client 两份 tsconfig

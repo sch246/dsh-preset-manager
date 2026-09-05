@@ -2,6 +2,10 @@
 
 Status: user-grounded intent awaiting a cold realization candidate against Harness alpha.2. Preserved locks are historical evidence, and implementation acceptance remains incomplete.
 
+## Using and maintaining this map
+
+Use this STATE as the installation and maintenance prompt. Its first map is incomplete: investigate the selected Host and learn while realizing the desired effects. Update the map when actual user feedback or checked environmental facts change a route, requirement or evidence limit; do not promote an old Agent claim into a user preference. LOG preserves consequential reasons selectively. A realization LOCK is optional exact-recovery evidence, not a prerequisite for useful work or acceptance. The selected protocol remains 0.2; the current user's 2026-09-06 direction supersedes a mandatory LOG → STATE → LOCK choreography without rewriting that immutable protocol.
+
 ## Intent
 
 Provide a DeepSeek Harness plugin named preset manager that makes a large preset roster easier to browse and use: group sidebar sessions by preset, manage the preset display projection, choose a default, and reduce noise in new-session preset selection without breaking existing sessions.
@@ -80,10 +84,38 @@ Cross-browser synchronization of local display order, visibility and overrides i
 
 Cross-product portability through dsh-std is not a current requirement. Reconsider that boundary only after a second real host or independent implementation exposes a portable semantic intersection, an explicit cross-product requirement appears, or an existing standard capability can satisfy the need without exporting Harness-specific row, service or lifecycle semantics.
 
+## Installation and maintenance route
+
+Use the full desired effects above when realizing a different Host; [DESIGN.md](../../DESIGN.md) explains this revision's implementation but does not replace those effects. The current source has an alpha.2 patch and build route; old pending-acceptance entries below describe the evidence gap, not absence of that source. Select the actual checkout, Home and profile and inspect local changes, existing preset contributions and `dsh-preset-manager.patch-state` in its Git metadata. The alpha.2 baseline is a known input, not a permanent version gate.
+
+From this repository root, with the selected checkout's build dependencies installed:
+
+```sh
+DSH_CHECKOUT=/root/deepseek-harness DSH_PROFILE=web bash scripts/setup.sh
+```
+
+[Setup](../../scripts/setup.sh) applies or recognizes the [tracked patch](../../patches/harness-groupby-preset.patch), checks source markers, regenerates shared Client/Cordis catalogs, records ownership, builds Host, ui-workspace declarations, api-remotes and ui-workspace bundles, runs the [plugin build](../../scripts/build.sh), and links package/row `dsh-preset-manager` into the profile. Its `dsh.client` browser contribution uses a no-op Host identity entry. Set `DSH_HOME` for a different Home. The installed `dsh` takes precedence over the checkout CLI; verify that it operates on the selected deployment.
+
+Check dependency, profile lockfile, resolved link, Bundle membership and one served browser contribution together. Setup can leave an applied patch if catalog generation fails before its receipt is written; a final message also does not prove profile registration when no CLI was available. Inspect the phase and existing diff before retrying, preserving original ownership evidence.
+
+On an upstream change, inspect official Workspace row/Session projection ownership, the preset grouping seat, cold Session preset selection, projection-cache completeness and recent-order refresh before reusing the patch. Native alpha.2 row actions and `composeAgent()` are already reused. Remove superseded adaptation when upstream provides equivalent behavior; keep the official selector fallback and avoid a second row renderer or default settings owner. Preset and Skill-manager adaptations may both touch generator mappings, while sidebar plugins consume related slots; compose source and regenerate shared catalogs instead of installing by precedence.
+
+When historical sessions are missing from groups, distinguish missing derived projection rows from missing durable preset identity. For logs beyond the normal cold-read budget, the [bounded maintenance rationale](../logs/2026-08-31-historical-preset-projection-cache-mismatch.md) explains why ordinary listing cannot complete the backfill. Investigate the selected Host’s maintenance controls and corpus size before choosing a bounded pass; if temporarily raising a profile budget, restore it after observing completion. No ready-made backfill command is retained here. Preserve authoritative logs. When a restored Session set has wrong recency, refresh the existing “最近更新” projection rather than rewriting timestamps or deleting all browser state.
+
+Verification follows the changed effects: typecheck/build establish mechanical completeness; PM-001–007 govern real grouping, selector, persistence, failure and removal observations. In particular, recheck overflow actions, narrow-row metadata, default-only updates with a mounted group tree and blank cold-session selection after related Host changes. A map-only edit uses JSON/link checks; the existing policy against tests that copy implementation semantics does not require running build for prose changes or remove the target Host's relevant checks.
+
+## Removal route
+
+```sh
+DSH_CHECKOUT=/root/deepseek-harness DSH_PROFILE=web bash scripts/uninstall.sh
+```
+
+[Uninstall](../../scripts/uninstall.sh) reverses only the exact patch it owns, regenerates shared catalogs and rebuilds affected faces; pre-existing or drifted Host source is preserved while profile removal is still attempted. Its completion message can follow a failed `dsh plugin remove`, so verify package/Bundle absence separately and reconcile any remaining effects before claiming removal. Preserve official settings, preset definitions, historical Sessions and browser-local display data unless deletion was separately requested. Observe restoration of the official selector and preservation of unrelated modifications under PM-007. Activation uses the selected deployment's existing restart authority; neither script restarts it.
+
 ## Resources and current reality
 
 - Repository: `https://github.com/sch246/dsh-preset-manager.git`.
-- Current committed source: `816e418a7f317b5c315ec7a6a89106ed14ddc257`. It is an input to recomposition rather than an accepted realization identity.
+- September 1 recomposition source: `816e418a7f317b5c315ec7a6a89106ed14ddc257`. The map review inspected `03868b08e0cbd448eaf777716ea6e14c6107f723`; both are source inputs rather than accepted realization identities.
 - No current candidate realizes this state on Harness alpha.2. The user selected a cold recomposition from the complete STATE against official alpha.2 target `0a53fb55bea101816fa226bb964ae2bed71c343b`, followed by feedback from the real installation.
 - At initial reconstruction, protocol 0.2 structural validation and both TypeScript no-emit checks passed. That mechanical observation did not include build, installation, browser or uninstall evidence.
 - The user subsequently tested the current creation flow and reported that it satisfies the observable requirement to reach the official creation interface with workspace and preset preselected.
@@ -107,7 +139,7 @@ Cross-product portability through dsh-std is not a current requirement. Reconsid
 
 ## Open tensions
 
-- No current realization candidate binds draft.24 to alpha.2. Candidate.4 remains historical alpha.1 evidence and is not reusable as the current target realization.
+- No current realization candidate binds this state to alpha.2. Candidate.4 remains historical alpha.1 evidence and is not reusable as the current target realization.
 - Cold recomposition on alpha.2 still requires observation in the real Web UI with persistent settings; alpha.2 has not been accepted.
 - The user's postscript exposed a session-row overflow mismatch. A source repair exists, but PM-004 still needs a deployed interaction check before it is accepted.
 - The row metadata order and long-label truncation need deployed observation at ordinary and narrow sidebar widths; mechanical patch checks do not accept PM-001.

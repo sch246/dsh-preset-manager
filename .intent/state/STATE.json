@@ -1,7 +1,7 @@
 {
   "$schema": "meta-intent/0.2/state",
   "id": "dsh-preset-manager",
-  "revision": "0.1.0-draft.25",
+  "revision": "0.1.0-draft.26",
   "status": "draft",
   "document": "STATE.md",
   "logs": [
@@ -26,7 +26,8 @@
     "../logs/2026-08-31-session-row-metadata-order.md",
     "../logs/2026-08-31-default-write-refresh-scope.md",
     "../logs/2026-09-01-target-drift-and-recomposition.md",
-    "../logs/2026-09-01-restored-session-order-snapshot.md"
+    "../logs/2026-09-01-restored-session-order-snapshot.md",
+    "../logs/2026-09-06-installation-maintenance-map.md"
   ],
   "protocol": {
     "id": "meta-intent",
@@ -42,7 +43,7 @@
       "kind": "git-repository",
       "uri": "https://github.com/sch246/dsh-preset-manager.git",
       "revision": "816e418a7f317b5c315ec7a6a89106ed14ddc257",
-      "scope": "current committed source selected as an input to cold recomposition; not an accepted realization"
+      "scope": "historical September 1 recomposition source input; current map inspection source is recorded separately, with acceptance pending"
     },
     {
       "id": "target.deepseek-harness",
@@ -50,6 +51,13 @@
       "uri": "https://github.com/deepseek-ai/deepseek-harness.git",
       "revision": "0a53fb55bea101816fa226bb964ae2bed71c343b",
       "scope": "official dsh-v0.1.2-alpha.2 target selected for cold recomposition; no alpha.2 realization is accepted"
+    },
+    {
+      "id": "source.installation-map-review",
+      "kind": "git-repository",
+      "uri": "https://github.com/sch246/dsh-preset-manager.git",
+      "revision": "03868b08e0cbd448eaf777716ea6e14c6107f723",
+      "scope": "source and documentation inspected for the 2026-09-06 installation map; not executed installation or acceptance evidence"
     }
   ],
   "activeLocks": [],

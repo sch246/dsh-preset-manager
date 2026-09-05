@@ -1,5 +1,7 @@
 # dsh-preset-manager
 
+安装与维护从 [STATE](.intent/state/STATE.md) 开始，其中包含目标变化、所有权、卸载路线与证据限制。
+
 [![DSH Plugin](https://img.shields.io/badge/DSH-Plugin-4c7dff)](https://github.com/deepseek-ai/deepseek-harness)
 
 **预设管理器**：为 [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) 的 Web GUI 增加官方"视图选项"菜单里的第三项 **「按预设」** 分组，并管理预设的显示层。

@@ -1,7 +1,5 @@
 # Preset manager intent
 
-Status: user-grounded intent awaiting a cold realization candidate against Harness alpha.2. Preserved locks are historical evidence, and implementation acceptance remains incomplete.
-
 ## Map entry
 
 Use the [installation and maintenance route](#installation-and-maintenance-route) and [removal route](#removal-route) for the selected deployment. The existing protocol 0.2 selection remains unchanged.
@@ -84,19 +82,27 @@ Cross-browser synchronization of local display order, visibility and overrides i
 
 Cross-product portability through dsh-std is not a current requirement. Reconsider that boundary only after a second real host or independent implementation exposes a portable semantic intersection, an explicit cross-product requirement appears, or an existing standard capability can satisfy the need without exporting Harness-specific row, service or lifecycle semantics.
 
+## Workspace entry and path migration
+
+The repository root is a private development workspace. The installable package is [packages/dsh-preset-manager](../../packages/dsh-preset-manager/package.json); `.intent/`, scripts, documentation and Host patches remain repository-owned. Replace old repository-root local package links with the absolute `packages/dsh-preset-manager` path through the selected profile plugin transaction; the root is no longer a runtime package. Package name, version, Bundle identity and `dsh.presetManager.v1` storage stay unchanged.
+
+`node scripts/plugin.mjs setup`, `inspect`, and `remove` inspect without mutation. `setup --install` and `remove --remove` select the operations below. Bash wrappers keep the same defaults; on Windows run the Node entry with Git Bash available for the existing Host patch scripts. No script restarts a service.
+
+`DSH_CHECKOUT=/absolute/harness node scripts/build.mjs build` builds only this package; `typecheck` checks both compiler faces. Install TypeScript 5.9.3 and tsdown 0.22.14 in the private workspace, or select an existing installed tools directory with `DSH_BUILD_TOOLS=/absolute/node_modules`. Build scripts invoke Node directly, never install tools, and create only local dependency directories with leaf links. The workspace records pnpm 10.17.1 for deliberate dependency management.
+
 ## Installation and maintenance route
 
-Use the full desired effects above when realizing a different Host; [DESIGN.md](../../DESIGN.md) explains this revision's implementation but does not replace those effects. The current source has an alpha.2 patch and build route; old pending-acceptance entries below describe the evidence gap, not absence of that source. Select the actual checkout, Home and profile and inspect local changes, existing preset contributions and `dsh-preset-manager.patch-state` in its Git metadata. The alpha.2 baseline is a known input, not a permanent version gate.
+Use the full desired effects above when realizing a different Host; [DESIGN.md](../../DESIGN.md) explains this revision's implementation but does not replace those effects. The current source has an alpha.2 patch and build route; historical evidence is kept in LOG. Select the actual checkout, Home and profile and inspect local changes, existing preset contributions and `dsh-preset-manager.patch-state` in its Git metadata. The alpha.2 baseline is a known input, not a permanent version gate.
 
 From this repository root, with the selected checkout's build dependencies installed:
 
 ```sh
-DSH_CHECKOUT=/root/deepseek-harness DSH_PROFILE=web bash scripts/setup.sh
+DSH_CHECKOUT=/absolute/harness DSH_HOME=/absolute/dsh-home DSH_PROFILE=web node scripts/plugin.mjs setup --install
 ```
 
-[Setup](../../scripts/setup.sh) applies or recognizes the [tracked patch](../../patches/harness-groupby-preset.patch), checks source markers, regenerates shared Client/Cordis catalogs, records ownership, builds Host, ui-workspace declarations, api-remotes and ui-workspace bundles, runs the [plugin build](../../scripts/build.sh), and links package/row `dsh-preset-manager` into the profile. Its `dsh.client` browser contribution uses a no-op Host identity entry. Set `DSH_HOME` for a different Home. The installed `dsh` takes precedence over the checkout CLI; verify that it operates on the selected deployment.
+[Setup](../../scripts/setup.sh) applies or recognizes the [tracked patch](../../patches/harness-groupby-preset.patch), checks source markers, regenerates shared Client/Cordis catalogs, records ownership, builds Host, ui-workspace declarations, api-remotes and ui-workspace bundles, runs the [plugin build](../../scripts/build.sh), and links package/row `dsh-preset-manager` into the profile. Its `dsh.client` browser contribution uses a no-op Host identity entry. All operations use the explicit Home/profile and the selected checkout built CLI.
 
-Check dependency, profile lockfile, resolved link, Bundle membership and one served browser contribution together. Setup can leave an applied patch if catalog generation fails before its receipt is written; a final message also does not prove profile registration when no CLI was available. Inspect the phase and existing diff before retrying, preserving original ownership evidence.
+Check dependency, profile lockfile, resolved link, Bundle membership and one served browser contribution together. Setup records patch ownership before catalog generation and rejects a missing built CLI before changing source. Later failures can still leave an incomplete install. Inspect the phase and existing diff before retrying, preserving original ownership evidence.
 
 On an upstream change, inspect official Workspace row/Session projection ownership, the preset grouping seat, cold Session preset selection, projection-cache completeness and recent-order refresh before reusing the patch. Native alpha.2 row actions and `composeAgent()` are already reused. Remove superseded adaptation when upstream provides equivalent behavior; keep the official selector fallback and avoid a second row renderer or default settings owner. Preset and Skill-manager adaptations may both touch generator mappings, while sidebar plugins consume related slots; compose source and regenerate shared catalogs instead of installing by precedence.
 
@@ -107,28 +113,10 @@ Verification follows the changed effects: typecheck/build establish mechanical c
 ## Removal route
 
 ```sh
-DSH_CHECKOUT=/root/deepseek-harness DSH_PROFILE=web bash scripts/uninstall.sh
+DSH_CHECKOUT=/absolute/harness DSH_HOME=/absolute/dsh-home DSH_PROFILE=web node scripts/plugin.mjs remove --remove
 ```
 
-[Uninstall](../../scripts/uninstall.sh) reverses only the exact patch it owns, regenerates shared catalogs and rebuilds affected faces; pre-existing or drifted Host source is preserved while profile removal is still attempted. Its completion message can follow a failed `dsh plugin remove`, so verify package/Bundle absence separately and reconcile any remaining effects before claiming removal. Preserve official settings, preset definitions, historical Sessions and browser-local display data unless deletion was separately requested. Observe restoration of the official selector and preservation of unrelated modifications under PM-007. Activation uses the selected deployment's existing restart authority; neither script restarts it.
-
-## Resources and current reality
-
-- Repository: `https://github.com/sch246/dsh-preset-manager.git`.
-- September 1 recomposition source: `816e418a7f317b5c315ec7a6a89106ed14ddc257`. The map review inspected `03868b08e0cbd448eaf777716ea6e14c6107f723`; both are source inputs rather than accepted realization identities.
-- No current candidate realizes this state on Harness alpha.2. The user selected a cold recomposition from the complete STATE against official alpha.2 target `0a53fb55bea101816fa226bb964ae2bed71c343b`, followed by feedback from the real installation.
-- At initial reconstruction, protocol 0.2 structural validation and both TypeScript no-emit checks passed. That mechanical observation did not include build, installation, browser or uninstall evidence.
-- The user subsequently tested the current creation flow and reported that it satisfies the observable requirement to reach the official creation interface with workspace and preset preselected.
-- The user selected the new-conversation selector as the sole preset-manager default-write entry and removed the sidebar star from the intended interaction. The selector distinguishes selection from default writes: a different option selects, the current non-default option sets the explicit user default on a repeated choice, and the current explicit default clears that setting on a repeated choice while preserving the pending selection. With no explicit user default, the recent Session preset then the managed-order first visible preset supply the fallback.
-- The user reported that managed sidebar ordering did not affect the new-conversation selector. Inspection confirmed that the sidebar consumes the existing complete order while selector roster derivation retained Host order. The state already required both surfaces to share one order, so this is a realization mismatch rather than a new state authority.
-- The user observed that starting PTC from a preset group and choosing the `root` workspace opened a reused blank Session under the Host default. Runtime evidence first showed the Host opening before selection, then exposed both a root-handler scope mismatch and a Host lookup that resumes the deleted historical preset before processing the requested replacement. The selected repair binds the start handler from root services, connects the workspace, selects the preset on the resulting Session through a Session-id BFF that can repair blank cold Sessions, and opens only after selection succeeds; started Sessions remain locked and seat reconciliation remains optional and conversation-scoped.
-- The user observed that historical Sessions did not populate preset groups. Their persisted headers contain preset identity, but older derived projection-cache records can lack the later-added `agentPreset` row. The selected repair treats a cache cut as complete only when every currently registered client-visible projection is usable, refreshes incomplete bounded cold reads from the complete log, and requires a one-time maintenance pass for historical logs outside the ordinary list budget.
-- The session-action mismatch has a source-level repair: the owner contract requires rename, fork and archive callbacks and preset rows pass them to the official renderer. Earlier mechanical checks and a clean patch reversal do not replace live deployed menu confirmation, which remains outstanding.
-- The user clarified that the preset Session row's workspace label belongs before relative time inside one right-aligned metadata block. The Host patch gives the label the shrinkable, ellipsized position and keeps time non-shrinking; deployed ordinary-width, narrow-width and hover observation remains outstanding.
-- The user reported that set and clear default actions become especially slow while preset grouping is mounted. Inspection found a plugin-local realization mismatch: one successful settings write starts overlapping roster loads, publishes loading, reconciles unchanged local state and repeatedly derives the Session tree even though the returned settings view already contains the complete explicit-default change. The selected behavior keeps default projection updates separate from genuine roster lifecycle refreshes and requires no Host patch change.
-- After the alpha.2 candidate Home was replaced with the restored formal Home, the user reported that “最近更新” displayed the wrong order. The service list remained correctly ordered and historical logs were not bulk-rewritten; the compatible explanation is the browser-local order account surviving the server-side Session-set replacement. The current realization must make selecting or reselecting recent-update order refresh those accounts from current timestamps.
-- Local compatibility target: `/root/deepseek-harness`; this path is bootstrap evidence, not a portable package requirement.
-- Candidate.4 binds draft.20, committed plugin source `21c3ad6fc9cf11228a8630f4dab3fc51d33eb9b1` and Harness alpha.1 base `cd5ef8148158c3a752a658978873241fdf8e2bbc`. Its receipt and all four preserved candidates remain historical evidence for earlier source and target identities; they are not current candidates or evidence of alpha.2 applicability or acceptance.
+[Uninstall](../../scripts/uninstall.sh) reverses only the exact patch it owns, regenerates shared catalogs and rebuilds affected faces; pre-existing or drifted Host source is preserved while profile removal is still attempted. A failed profile transaction exits unsuccessfully; verify package/Bundle absence separately and reconcile any remaining effects before claiming removal. Preserve official settings, preset definitions, historical Sessions and browser-local display data unless deletion was separately requested. Observe restoration of the official selector and preservation of unrelated modifications under PM-007. Activation uses the selected deployment's existing restart authority; neither script restarts it.
 
 ## Implementation hints
 
@@ -136,13 +124,3 @@ DSH_CHECKOUT=/root/deepseek-harness DSH_PROFILE=web bash scripts/uninstall.sh
 - The complete `order` + independent `hidden` + explicit user default in official settings is the selected state model. The new-conversation selector owns set and clear operations; the sidebar has no parallel default control. Deployment fallback remains separate, and the selector uses the recent Session preset then managed order when the user default is absent. Equivalent future realizations may differ if they continue to satisfy P1–P5.
 - A default-only settings change projects the returned or mirrored user-layer default onto the current roster without refreshing roster identity. Initial load and connection recovery remain the refresh owners for roster lifecycle changes.
 - Local persistence currently uses `dsh.presetManager.v1` with a versioned schema. This is a migration constraint for existing users, not necessarily the only future storage mechanism.
-
-## Open tensions
-
-- No current realization candidate binds this state to alpha.2. Candidate.4 remains historical alpha.1 evidence and is not reusable as the current target realization.
-- Cold recomposition on alpha.2 still requires observation in the real Web UI with persistent settings; alpha.2 has not been accepted.
-- The user's postscript exposed a session-row overflow mismatch. A source repair exists, but PM-004 still needs a deployed interaction check before it is accepted.
-- The row metadata order and long-label truncation need deployed observation at ordinary and narrow sidebar widths; mechanical patch checks do not accept PM-001.
-- The exact UX for no-workspace creation failure, broken presets, large preset lists and error recovery is not explicit enough to treat as accepted.
-- The new-conversation default marker, repeat-selection action and visible write failure require deployed interaction evidence before they are accepted.
-- Runtime compatibility on alpha.2, current-source drift maintenance and owned uninstall evidence remain absent from this package.

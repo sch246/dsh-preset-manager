@@ -16,33 +16,23 @@
 
 > 详细设计（补丁落点、列表不变量、RPC 使用、已知限制）见 [DESIGN.md](DESIGN.md)。
 
-## 安装
+## 开发与安装入口
 
-前置：可运行的 dsh checkout（`dsh web`）、Node.js `^22.19.0 || >=24.0.0`、pnpm。
+仓库根目录是 private 开发 workspace；实际 npm 包为 [`packages/dsh-preset-manager`](packages/dsh-preset-manager/package.json)。原根目录的源码、Bundle、编译配置与 `lib/` 已移入该包；现有本地安装需通过 profile plugin 事务把旧根链接替换为新的绝对包路径。包名、版本、Bundle 身份和持久化键不变。
 
-```bash
-git clone https://github.com/sch246/dsh-preset-manager.git
-cd dsh-preset-manager
-npm install                        # devDeps：typescript / tsdown / @types/node
-bash scripts/setup.sh              # 见下：补丁 + 重建 + 注册 bundle
+```sh
+node scripts/plugin.mjs inspect
+node scripts/plugin.mjs setup         # 只检查
+node scripts/plugin.mjs remove        # 只检查
+DSH_CHECKOUT=/absolute/harness DSH_BUILD_TOOLS=/absolute/node_modules node scripts/build.mjs build
+DSH_CHECKOUT=/absolute/harness DSH_BUILD_TOOLS=/absolute/node_modules node scripts/build.mjs typecheck
+DSH_CHECKOUT=/absolute/harness DSH_HOME=/absolute/dsh-home DSH_PROFILE=web node scripts/plugin.mjs setup --install
+DSH_CHECKOUT=/absolute/harness DSH_HOME=/absolute/dsh-home DSH_PROFILE=web node scripts/plugin.mjs remove --remove
 ```
 
-当前补丁以 DSH `0.1.2-alpha.2` 为目标。`scripts/setup.sh` 依次做五件事（任一步失败即中止）：
+根 scripts 暴露 `build`、`typecheck`、`setup`、`inspect`、`remove`。固定开发工具为 TypeScript 5.9.3、tsdown 0.22.14、pnpm 10.17.1；构建直接调用已安装 Node 工具，不自动安装依赖。可使用根目录自身的 `node_modules`，或以 `DSH_BUILD_TOOLS` 指向已有工具目录；构建依赖仅创建候选内的独立目录和叶子链接。安装／移除调用明确 checkout 的已构建 CLI，变更 profile 的依赖、锁文件和 Bundle；不会重启服务。Windows 可使用同一 Node 入口，Host 补丁步骤需要 Git Bash。
 
-1. 从本仓库受 Git 跟踪的 `patches/harness-groupby-preset.patch` 识别“尚未应用/已完整应用/冲突”三种状态；已应用可重复安装，冲突不改宿主；
-2. 应用（或复用）补丁，核对就近的 `@meta-intent` source-region owner 标记，随后从当前全部源贡献重生成共享 slot/API catalog；补丁本身不静态拥有生成文件；
-3. 记录补丁 SHA-256、owner region、生成物映射与本次 setup 的实际所有权，并生成 ui-workspace Client 声明、运行 Host、api-remotes Client 与 ui-workspace bundle 构建；
-4. 构建本插件（`scripts/build.sh`，自动探测 `DSH_CHECKOUT`）；
-5. `dsh plugin --profile web add .` 注册 bundle。
-
-最后**重启 dsh web**。回滚：`bash scripts/uninstall.sh`；它只撤销由 setup 实际应用且仍完全匹配的补丁，再从剩余源贡献重生成共享 catalog；预先存在的相同 Host 效果不会被本插件认领或删除。
-
-> 故障排查：如果 `github:` 安装卡在 `git ls-remote git@github.com:...`（pnpm 把 GitHub 解析成 SSH），改用 HTTPS clone + 本地路径安装：
-> ```bash
-> git clone https://github.com/sch246/dsh-preset-manager.git
-> cd dsh-preset-manager
-> dsh plugin --profile web add .
-> ```
+安装执行原有补丁正反检查、归属凭据、共享 catalog 重生成、Host 相关编译面重建与插件构建，再注册实际包路径。升级时按 STATE 检查上游等价能力并适配或撤销多余补丁；移除只撤销仍归本插件所有且精确匹配的 Host 内容，保留业务数据和其他改动。
 
 ## 使用
 
@@ -57,23 +47,7 @@ bash scripts/setup.sh              # 见下：补丁 + 重建 + 注册 bundle
 
 ## 目录结构
 
-```
-dsh-preset-manager/
-├── package.json              # dsh.bundle.patch + dsh.client（platform web）
-├── cordis.patch.yml          # bundle 身份行（lib/index.js 为空 apply）
-├── patches/
-│   └── harness-groupby-preset.patch   # ui-workspace 席位、历史投影回填与冷 preset 选择（§DESIGN 3.1）
-├── tsconfig.json / tsconfig.client.json / tsdown.config.ts
-├── scripts/
-│   ├── build.sh              # junction 链接 checkout 依赖 + tsc + tsdown
-│   ├── setup.sh              # 补丁 → 重建 → 构建 → dsh plugin add
-│   └── uninstall.sh          # 回滚补丁 + 卸 bundle
-├── src/index.ts              # 节点半身：identity apply（装配锚点）
-├── src/client/               # 浏览器半身（分组树 / 管理 / shadow chip；roster.ts 纯函数 + locales/styles）
-├── lib/                      # 构建产物（随源码提交）
-├── DESIGN.md                 # 详细设计
-└── README.md
-```
+根目录持有 `.intent/`、`AGENTS.md`、`scripts/`、`patches/` 和文档；`packages/dsh-preset-manager/` 持有源码、Bundle、编译配置与已跟踪 `lib/`。
 
 ## 工作原理
 

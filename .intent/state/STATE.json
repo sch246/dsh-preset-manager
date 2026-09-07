@@ -27,7 +27,8 @@
     "../logs/2026-08-31-default-write-refresh-scope.md",
     "../logs/2026-09-01-target-drift-and-recomposition.md",
     "../logs/2026-09-01-restored-session-order-snapshot.md",
-    "../logs/2026-09-06-installation-maintenance-map.md"
+    "../logs/2026-09-06-installation-maintenance-map.md",
+    "../logs/2026-09-07-workspace-standardization.md"
   ],
   "protocol": {
     "id": "meta-intent",

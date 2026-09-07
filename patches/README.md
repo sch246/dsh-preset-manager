@@ -18,7 +18,7 @@ git -C <checkout> apply --unidiff-zero --check patches/harness-groupby-preset.pa
 git -C <checkout> apply --unidiff-zero --check --reverse patches/harness-groupby-preset.patch
 ```
 
-安装与回滚只走 `scripts/setup.sh` / `scripts/uninstall.sh`。setup 先识别“已完整应用”
+安装与回滚只走 `scripts/setup.sh --install` / `scripts/uninstall.sh --remove`。setup 先识别“已完整应用”
 再尝试 apply，因此可重复运行；它在目标 checkout 的 Git metadata 中同时记录补丁
 SHA-256 与本次 setup 是否实际应用了补丁。uninstall 只回滚由 setup 实际应用、且 SHA
 仍完全匹配的补丁；预先存在或已漂移的 Host 效果保持不动。

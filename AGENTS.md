@@ -1,3 +1,15 @@
+<!-- meta-intent:entry:start -->
+## Intent-package entry
+
+Maintain an executable installation and maintenance map as user understanding, upstream software and environments change. The first map can be incomplete; use user feedback and checked reality to improve it, rather than making accumulated implementation debt the permanent design.
+
+- Start with [this package's STATE](.intent/state/STATE.md) and the user's request. STATE tells an unfamiliar Agent which effects to provide, why they matter, where to find resources, and how to install, adapt, verify and remove them under applicable conditions. Keep every supported capability reachable from that map.
+- Before writing, distinguish the information's role. STATE owns intended effects and reusable operational guidance. LOG owns selected actual decisions, observations and their reasons; historical implementation gaps, debt inventories and task progress belong there or in a disposable work record. Keep conditions and adaptation steps needed to act in STATE, without turning it into a status table. LOCK retains an exact purpose-bound realization, not permanent requirements. Do not turn this distinction into a mandatory document transaction for each repair.
+- Inspect the target and recover relevant existing decisions before inferring new requirements. Code, tests and past installations are evidence about implementations; they do not decide user intent. Optional cooperation does not establish a required dependency. Change STATE when feedback clarifies an effect or experience improves the executable route, not merely because current code differs.
+- Act within the user's existing authority. Read selected sources when why, scope or attribution matters; do not replay every LOG. Choose checks that resolve a real uncertainty at reasonable cost, and distinguish observed results from unperformed checks.
+- This entry routes attention; it does not replace STATE or the selected protocol. Follow the package's state record for protocol/binding changes. See [meta-intent's map](../meta-intent/state/STATE.md) when maintaining this guidance or when the roles themselves are unclear.
+<!-- meta-intent:entry:end -->
+
 # AGENTS.md — dsh-preset-manager
 
 外部 DSH 插件仓库（独立于 deepseek-harness 主仓）+ 一个最小 harness 补丁。给 AI 协作者/后续维护者的约定：
@@ -10,9 +22,9 @@
 
 ## 装配模型
 
-- 本包是**双面 bundle 插件**：`cordis.patch.yml` 身份行（节点半身 = identity apply）+ `dsh.client`（浏览器半身）。
+- 本包是**双面 bundle 插件**：`packages/dsh-preset-manager/cordis.patch.yml` 身份行（节点半身 = identity apply）+ `dsh.client`（浏览器半身）。
 - **补丁路线**：`patches/harness-groupby-preset.patch` 增加 ui-workspace preset 分组席位，并让 session projection cache 向列表报告和有界回填缺失的当前客户端投影。具体落点随目标 harness 版本演进；改补丁必须同步 DESIGN.md §3.1、`patches/README.md` 与 README。
-- 装配：`scripts/setup.sh`（`git apply --check` → apply → 重生成共享 catalog → 构建 Host 与 ui-workspace → 构建本插件 → `dsh plugin add`）；`lib/` 与静态补丁提交进 git，共享生成物不由补丁独占。
+- 装配：`scripts/setup.sh --install`（`git apply --check` → apply → 重生成共享 catalog → 构建 Host 与 ui-workspace → 构建本插件 → `dsh plugin add`）；`packages/dsh-preset-manager/lib/` 与静态补丁提交进 git，共享生成物不由补丁独占。
 - 运行时与构建改动执行 `bash scripts/build.sh`（DSH_CHECKOUT 指向所选 dsh checkout）；纯地图/文档改动检查引用、JSON 和 diff，不为此重建或安装插件。
 
 ## 约束（为什么这么设计）
@@ -26,12 +38,12 @@
 
 - 浏览器半身：业务逻辑走 apply 闭包 / 纯函数（`roster.ts`），组件只收四个 props share（runtime / renderSlots / store / inject），不读 ctx、不手写订阅。
 - STATE 是唯一行为权威；本插件不维护复述实现语义的代码测试，以免 LLM 误读意图后让代码与测试互相证明。`typecheck` / `build` 只检查机械完整性，行为由真实 Web UI 与 settings 持久化（含刷新、重启）直接对照 STATE 验收。
-- 插件自有装饰样式只有 `src/client/styles.ts` 一个来源：字符串常量 + 首执行注入 `<style>`；只用 `--dsw-*` token 与语义别名，不写字面量颜色，也不覆盖官方行布局。
+- 插件自有装饰样式只有 `packages/dsh-preset-manager/src/client/styles.ts` 一个来源：字符串常量 + 首执行注入 `<style>`；只用 `--dsw-*` token 与语义别名，不写字面量颜色，也不覆盖官方行布局。
 - 产品文案中文，注释英文；对外承诺（RPC 用法、已知限制）改完必须同步 `DESIGN.md` / `README.md`。
 
 ## 运行时改动检查（提交前）
 
 ```bash
-npm run typecheck   # host + client 两份 tsconfig
+node scripts/build.mjs typecheck   # host + client 两份 tsconfig
 bash scripts/build.sh   # 产物 lib/ 必须同步提交
 ```

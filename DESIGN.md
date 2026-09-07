@@ -78,8 +78,8 @@ ctx.slots.inject('sidebar.workspaces.presetGroups', () => ctx.slots.register({
 
 ### 3.3 补丁的安装与回滚（`scripts/`）
 
-- `scripts/setup.sh`：识别补丁缺失、已完整存在或冲突；仅在自己实际 apply 时记录 Host 效果所有权，随后重建 Host、api-remotes Client、ui-workspace 与插件，并 `dsh plugin add`。任一步失败即中止并提示。
-- `scripts/uninstall.sh`：仅当记录表明补丁由 setup 实际应用、SHA 仍一致且 reverse check 通过时才回滚；预先存在或已漂移的 Host 效果保持不动，bundle 仍按正常流程移除。
+- `scripts/setup.sh --install`：识别补丁缺失、已完整存在或冲突；仅在自己实际 apply 时记录 Host 效果所有权，随后重建 Host、api-remotes Client、ui-workspace 与插件，并 `dsh plugin add`。任一步失败即中止并提示。
+- `scripts/uninstall.sh --remove`：仅当记录表明补丁由 setup 实际应用、SHA 仍一致且 reverse check 通过时才回滚；预先存在或已漂移的 Host 效果保持不动，bundle 仍按正常流程移除。
 - 升级冲突：dsh 升级后补丁可能不适用；`--check` 先行检测，冲突时给出提示而不是硬打。补丁依赖 ui-workspace 的 preset 分组入口和 owner 行契约、session projection/cache/list 的冷读接口，以及 Session Controller 的 Agent 激活事务，升级时以当前 diff 与测试为准。
 
 ### 3.4 新会话选择器接管（shadow，保留）
@@ -175,7 +175,7 @@ derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组
 ## 6. 组件结构
 
 ```
-src/client/
+packages/dsh-preset-manager/src/client/
 ├── index.ts            # apply：store 工厂 + roster/seat 控制器 + presetGroups 注册 + shadow SeatChip
 ├── stores.ts           # createPresetManagerStore + actions（setOrder/reconcileState/ensureDefaultVisible/setOverride）
 ├── roster.ts           # deriveRoster / derivePresetGroups / reconcile / planHide…（纯函数）
@@ -242,16 +242,4 @@ src/client/
 
 ## 11. 仓库布局（含补丁）
 
-```
-dsh-preset-manager/
-├── patches/
-│   └── harness-groupby-preset.patch   # ui-workspace 席位、历史投影回填与冷 preset 选择（unified diff）
-├── scripts/
-│   ├── build.sh        # junction 链接 checkout 依赖 + tsc + tsdown
-│   ├── setup.sh        # 补丁 --check+apply → 重生成 catalog → 重建 Host/UI → 构建插件 → dsh plugin add
-│   └── uninstall.sh    # 回滚补丁 + 卸 bundle
-├── src/index.ts        # 节点半身：identity apply（装配锚点）
-├── src/client/         # 浏览器半身（§6）
-├── DESIGN.md / README.md / AGENTS.md
-└── lib/                # 构建产物，随源码提交
-```
+根目录保存 `.intent/`、`AGENTS.md`、文档、`scripts/` 与 `patches/`。`packages/dsh-preset-manager/` 保存包清单、`cordis.patch.yml`、`src/`、编译配置与随源码提交的 `lib/`。所有开发、安装与移除命令从根目录统一入口运行，见 README。

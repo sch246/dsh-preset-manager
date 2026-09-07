@@ -1,0 +1,37 @@
+# Workspace standardization — 2026-09-07
+
+The user selected a private root workspace, package-local runtime artifacts, common explicit installation entries and MIT while preserving plugin identities and behavior. No live installation, profile migration, Host mutation, service restart or push was performed in this candidate worktree.
+
+Build and typecheck use existing TypeScript 5.9.3 and tsdown 0.22.14 through direct Node calls. Source and Host patch contents are unchanged. Patch ownership is recorded before generators; profile CLI failures propagate. Historical map observations below are retained as evidence rather than operational requirements.
+
+## Resources and current reality
+
+- Repository: `https://github.com/sch246/dsh-preset-manager.git`.
+- September 1 recomposition source: `816e418a7f317b5c315ec7a6a89106ed14ddc257`. The map review inspected `03868b08e0cbd448eaf777716ea6e14c6107f723`; both are source inputs rather than accepted realization identities.
+- No current candidate realizes this state on Harness alpha.2. The user selected a cold recomposition from the complete STATE against official alpha.2 target `0a53fb55bea101816fa226bb964ae2bed71c343b`, followed by feedback from the real installation.
+- At initial reconstruction, protocol 0.2 structural validation and both TypeScript no-emit checks passed. That mechanical observation did not include build, installation, browser or uninstall evidence.
+- The user subsequently tested the current creation flow and reported that it satisfies the observable requirement to reach the official creation interface with workspace and preset preselected.
+- The user selected the new-conversation selector as the sole preset-manager default-write entry and removed the sidebar star from the intended interaction. The selector distinguishes selection from default writes: a different option selects, the current non-default option sets the explicit user default on a repeated choice, and the current explicit default clears that setting on a repeated choice while preserving the pending selection. With no explicit user default, the recent Session preset then the managed-order first visible preset supply the fallback.
+- The user reported that managed sidebar ordering did not affect the new-conversation selector. Inspection confirmed that the sidebar consumes the existing complete order while selector roster derivation retained Host order. The state already required both surfaces to share one order, so this is a realization mismatch rather than a new state authority.
+- The user observed that starting PTC from a preset group and choosing the `root` workspace opened a reused blank Session under the Host default. Runtime evidence first showed the Host opening before selection, then exposed both a root-handler scope mismatch and a Host lookup that resumes the deleted historical preset before processing the requested replacement. The selected repair binds the start handler from root services, connects the workspace, selects the preset on the resulting Session through a Session-id BFF that can repair blank cold Sessions, and opens only after selection succeeds; started Sessions remain locked and seat reconciliation remains optional and conversation-scoped.
+- The user observed that historical Sessions did not populate preset groups. Their persisted headers contain preset identity, but older derived projection-cache records can lack the later-added `agentPreset` row. The selected repair treats a cache cut as complete only when every currently registered client-visible projection is usable, refreshes incomplete bounded cold reads from the complete log, and requires a one-time maintenance pass for historical logs outside the ordinary list budget.
+- The session-action mismatch has a source-level repair: the owner contract requires rename, fork and archive callbacks and preset rows pass them to the official renderer. Earlier mechanical checks and a clean patch reversal do not replace live deployed menu confirmation, which remains outstanding.
+- The user clarified that the preset Session row's workspace label belongs before relative time inside one right-aligned metadata block. The Host patch gives the label the shrinkable, ellipsized position and keeps time non-shrinking; deployed ordinary-width, narrow-width and hover observation remains outstanding.
+- The user reported that set and clear default actions become especially slow while preset grouping is mounted. Inspection found a plugin-local realization mismatch: one successful settings write starts overlapping roster loads, publishes loading, reconciles unchanged local state and repeatedly derives the Session tree even though the returned settings view already contains the complete explicit-default change. The selected behavior keeps default projection updates separate from genuine roster lifecycle refreshes and requires no Host patch change.
+- After the alpha.2 candidate Home was replaced with the restored formal Home, the user reported that “最近更新” displayed the wrong order. The service list remained correctly ordered and historical logs were not bulk-rewritten; the compatible explanation is the browser-local order account surviving the server-side Session-set replacement. The current realization must make selecting or reselecting recent-update order refresh those accounts from current timestamps.
+- Local compatibility target: `/root/deepseek-harness`; this path is bootstrap evidence, not a portable package requirement.
+- Candidate.4 binds draft.20, committed plugin source `21c3ad6fc9cf11228a8630f4dab3fc51d33eb9b1` and Harness alpha.1 base `cd5ef8148158c3a752a658978873241fdf8e2bbc`. Its receipt and all four preserved candidates remain historical evidence for earlier source and target identities; they are not current candidates or evidence of alpha.2 applicability or acceptance.
+
+## Open tensions
+
+- No current realization candidate binds this state to alpha.2. Candidate.4 remains historical alpha.1 evidence and is not reusable as the current target realization.
+- Cold recomposition on alpha.2 still requires observation in the real Web UI with persistent settings; alpha.2 has not been accepted.
+- The user's postscript exposed a session-row overflow mismatch. A source repair exists, but PM-004 still needs a deployed interaction check before it is accepted.
+- The row metadata order and long-label truncation need deployed observation at ordinary and narrow sidebar widths; mechanical patch checks do not accept PM-001.
+- The exact UX for no-workspace creation failure, broken presets, large preset lists and error recovery is not explicit enough to treat as accepted.
+- The new-conversation default marker, repeat-selection action and visible write failure require deployed interaction evidence before they are accepted.
+- Runtime compatibility on alpha.2, current-source drift maintenance and owned uninstall evidence remain absent from this package.
+
+## Candidate verification
+
+`DSH_CHECKOUT=/root/deepseek-harness DSH_BUILD_TOOLS=/root/dsh-decoupling-apply/sidebar/node_modules node scripts/build.mjs build` passed with TypeScript 5.9.3 and tsdown 0.22.14. After that external tools path became unavailable during concurrent cleanup, `DSH_CHECKOUT=/root/deepseek-harness DSH_BUILD_TOOLS=/root/dsh-block-edit/user-files/node_modules node scripts/build.mjs typecheck` passed against the same versions. Default inspect/setup/remove and shell/Node syntax checks passed. No behavior test or live deployment acceptance was run for this mechanical layout change.

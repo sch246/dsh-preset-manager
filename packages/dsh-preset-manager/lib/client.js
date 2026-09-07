@@ -782,33 +782,35 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 				});
 			};
 			let status = null;
-			if (groups.length === 0) if (rosterSnapshot.status === "error") status = /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: css.status,
-				children: [
-					t("empty.error"),
-					" ",
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-						type: "button",
-						className: css.retry,
-						onClick: () => {
-							load();
-						},
-						children: t("retry")
-					})
-				]
-			});
-			else if (rosterSnapshot.status !== "ready") status = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-				className: css.status,
-				children: t("empty.loading")
-			});
-			else if (query.trim() !== "") status = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-				className: css.empty,
-				children: t("empty.noMatches")
-			});
-			else status = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-				className: css.empty,
-				children: t("empty.none")
-			});
+			if (groups.length === 0) {
+				if (rosterSnapshot.status === "error") status = /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: css.status,
+					children: [
+						t("empty.error"),
+						" ",
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: css.retry,
+							onClick: () => {
+								load();
+							},
+							children: t("retry")
+						})
+					]
+				});
+				else if (rosterSnapshot.status !== "ready") status = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: css.status,
+					children: t("empty.loading")
+				});
+				else if (query.trim() !== "") status = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: css.empty,
+					children: t("empty.noMatches")
+				});
+				else status = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: css.empty,
+					children: t("empty.none")
+				});
+			}
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: css.root,
 				children: [

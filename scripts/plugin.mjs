@@ -1,3 +1,4 @@
+import { inspectProfile } from './profile-inspect.mjs'
 /** Explicit deployment selection; inspection never applies a patch or changes a profile. */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
@@ -13,7 +14,10 @@ const cli = selected.DSH_CHECKOUT && join(selected.DSH_CHECKOUT, 'apps/cli/lib/b
 const patch = join(root, 'patches', 'harness-groupby-preset.patch')
 const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
 console.log(JSON.stringify({ package: manifest.name, packageRoot, ...selected, cliReady: Boolean(cli && existsSync(cli)), patchReady: existsSync(patch) }, null, 2))
-if (flags.length === 0) process.exit(0)
+if (flags.length === 0) {
+  console.log(JSON.stringify(inspectProfile(manifest.name, packageRoot, 'dsh-preset-manager.patch-state'), null, 2))
+  process.exit(0)
+}
 for (const [key, value] of Object.entries(selected)) if (!value) throw new Error(`Set ${key} explicitly`)
 for (const key of ['DSH_CHECKOUT', 'DSH_HOME']) if (!isAbsolute(selected[key]) || !existsSync(selected[key]) || !statSync(selected[key]).isDirectory()) throw new Error(`${key} must be an existing absolute directory`)
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u.test(selected.DSH_PROFILE)) throw new Error('DSH_PROFILE must be a profile name without path separators')

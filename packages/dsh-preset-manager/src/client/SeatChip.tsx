@@ -1,7 +1,7 @@
 /**
  * The shadow new-session preset chip (priority -1 over the official
  * `conversation.hero.agentPreset` entry; uninstalling the plugin restores
- * the official chip). Same stage→apply semantics as the official seat, but
+ * the official chip). The selection follows the current Session;
  * the roster is the plugin's derived list: only visible (ordered) presets,
  * display overrides applied, opened by the explicit-default → recent Session
  * → managed-order priority. Repeating the selected row sets or clears the
@@ -21,7 +21,7 @@ import { css } from './styles.ts'
 
 /** Selection and apply state of the seat controller. */
 export interface SeatState {
-  /** The initial or manually selected preset for this mounted page. */
+  /** The committed Session preset, or the choice awaiting the first Session. */
   current: string
   /** A rejected apply's message, cleared by the next attempt. */
   error: string | null
@@ -148,6 +148,7 @@ export function SeatChip({ useRoster, useStore, useSeat, load, sync, select, set
           </button>
         )}
       />
+      {seat.error !== null && <span className={css.seatNotice} role="alert">{seat.error}</span>}
       {notice !== null && <span className={css.seatNotice} role="alert">{t(notice)}</span>}
     </span>
   )

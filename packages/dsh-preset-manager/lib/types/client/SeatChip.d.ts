@@ -5,7 +5,7 @@ import type { PresetManagerKey } from './locales.ts';
 import type { createPresetManagerStore } from './stores.ts';
 /** Selection and apply state of the seat controller. */
 export interface SeatState {
-    /** The initial or manually selected preset for this mounted page. */
+    /** The committed Session preset, or the choice awaiting the first Session. */
     current: string;
     /** A rejected apply's message, cleared by the next attempt. */
     error: string | null;

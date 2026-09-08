@@ -978,7 +978,7 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 		/**
 		* The shadow new-session preset chip (priority -1 over the official
 		* `conversation.hero.agentPreset` entry; uninstalling the plugin restores
-		* the official chip). Same stage→apply semantics as the official seat, but
+		* the official chip). The selection follows the current Session;
 		* the roster is the plugin's derived list: only visible (ordered) presets,
 		* display overrides applied, opened by the explicit-default → recent Session
 		* → managed-order priority. Repeating the selected row sets or clears the
@@ -1013,78 +1013,86 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 			if (chosen === void 0) return null;
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 				className: css.seatRoot,
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
-					open,
-					onClose: () => {
-						setOpen(false);
-					},
-					items: options.map((option) => ({
-						id: option.id,
-						label: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-							className: `${css.menuItem}${option.defaultAction !== void 0 ? ` ${css.menuItemDefaultCandidate}` : ""}`,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-								className: css.menuItemHeading,
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: css.menuItemName,
-										children: option.displayName
-									}),
-									option.isDefault && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: css.menuItemDefault,
-										children: t("seat.default")
-									}),
-									option.defaultAction !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: css.menuItemDefaultAction,
-										children: t(option.defaultAction === "set-default" ? "seat.setDefault" : "seat.unsetDefault")
-									})
-								]
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: css.menuItemDesc,
-								children: option.description ?? t("seat.noDescription")
-							})]
-						})
-					})),
-					selectedId: chosen.id,
-					onSelect: (id) => {
-						setOpen(false);
-						const action = classifySeatPick(chosen.id, defaultId, id);
-						setNotice(null);
-						if (action === "select") {
-							select(id);
-							return;
-						}
-						setDefaultBusy(true);
-						(action === "set-default" ? setDefault(id) : unsetDefault(id)).then((failure) => {
-							setNotice(failure ?? null);
-						}).catch(() => {
-							setNotice("action.failed");
-						}).finally(() => {
-							setDefaultBusy(false);
-						});
-					},
-					align: "start",
-					portal: true,
-					anchor: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
-						type: "button",
-						className: css.seat,
-						"aria-haspopup": "menu",
-						"aria-expanded": open,
-						title: seat.error ?? t("seat.hint"),
-						disabled: seat.busy || defaultBusy,
-						onClick: () => {
-							setOpen((value) => !value);
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
+						open,
+						onClose: () => {
+							setOpen(false);
 						},
-						children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconAgentPresetOutline16, { className: css.seatIcon }),
-							chosen.displayName,
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { className: css.seatChevron })
-						]
+						items: options.map((option) => ({
+							id: option.id,
+							label: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+								className: `${css.menuItem}${option.defaultAction !== void 0 ? ` ${css.menuItemDefaultCandidate}` : ""}`,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+									className: css.menuItemHeading,
+									children: [
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: css.menuItemName,
+											children: option.displayName
+										}),
+										option.isDefault && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: css.menuItemDefault,
+											children: t("seat.default")
+										}),
+										option.defaultAction !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: css.menuItemDefaultAction,
+											children: t(option.defaultAction === "set-default" ? "seat.setDefault" : "seat.unsetDefault")
+										})
+									]
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: css.menuItemDesc,
+									children: option.description ?? t("seat.noDescription")
+								})]
+							})
+						})),
+						selectedId: chosen.id,
+						onSelect: (id) => {
+							setOpen(false);
+							const action = classifySeatPick(chosen.id, defaultId, id);
+							setNotice(null);
+							if (action === "select") {
+								select(id);
+								return;
+							}
+							setDefaultBusy(true);
+							(action === "set-default" ? setDefault(id) : unsetDefault(id)).then((failure) => {
+								setNotice(failure ?? null);
+							}).catch(() => {
+								setNotice("action.failed");
+							}).finally(() => {
+								setDefaultBusy(false);
+							});
+						},
+						align: "start",
+						portal: true,
+						anchor: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: css.seat,
+							"aria-haspopup": "menu",
+							"aria-expanded": open,
+							title: seat.error ?? t("seat.hint"),
+							disabled: seat.busy || defaultBusy,
+							onClick: () => {
+								setOpen((value) => !value);
+							},
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconAgentPresetOutline16, { className: css.seatIcon }),
+								chosen.displayName,
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { className: css.seatChevron })
+							]
+						})
+					}),
+					seat.error !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: css.seatNotice,
+						role: "alert",
+						children: seat.error
+					}),
+					notice !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: css.seatNotice,
+						role: "alert",
+						children: t(notice)
 					})
-				}), notice !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-					className: css.seatNotice,
-					role: "alert",
-					children: t(notice)
-				})]
+				]
 			});
 		}
 		//#endregion
@@ -1105,7 +1113,7 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 					console.warn("preset selection failed:", selected);
 					return "action.failed";
 				}
-				actions.acceptSelection(selected.value);
+				actions.acceptSelection(sessionId, selected.value);
 				actions.open(sessionId);
 				return;
 			} catch (error) {
@@ -1322,10 +1330,7 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 				actions.setOverride(id, override);
 			}
 		};
-		/**
-		* Stages the next session's preset and applies it when one becomes current
-		* (the official stage→apply semantics, minus the introduce cue).
-		*/
+		/** Keeps the hero selection attached to the current Session. */
 		var SeatController = class {
 			remote;
 			currentSession;
@@ -1334,107 +1339,150 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 				error: null,
 				busy: false
 			});
-			/** Current initial-priority result, used to recover a rejected selection. */
-			fallback = "";
-			/** Manual choice retained for this mounted page across asynchronous refreshes. */
+			roster = [];
+			sessionId;
+			/** A choice belongs to one page; an unbound choice follows its first Session. */
 			manualSelection;
-			/** Manual choice still waiting to be applied to a blank Session. */
-			pendingApply;
+			/** Successful Remote result while the Session list projection catches up. */
+			appliedSelection;
+			flight;
+			disposed = false;
+			generation = 0;
 			constructor(remote, currentSession) {
 				this.remote = remote;
 				this.currentSession = currentSession;
 			}
 			set(patch) {
+				if (this.disposed) return;
 				this.store.set({
 					...this.store.getSnapshot(),
 					...patch
 				});
 			}
-			/**
-			* Resolve initial selection from explicit user default → recent Session →
-			* first visible healthy managed entry. A later manual choice stays current.
-			*/
-			sync(roster) {
-				const available = roster.filter((entry) => !entry.hidden && !entry.broken);
-				const availableIds = new Set(available.map((entry) => entry.id));
-				if (this.manualSelection !== void 0 && !availableIds.has(this.manualSelection)) {
-					this.manualSelection = void 0;
-					this.pendingApply = void 0;
+			/** Read the current Session and retire choices belonging to the previous page. */
+			session() {
+				const session = this.currentSession();
+				if (session?.id !== this.sessionId) {
+					this.generation++;
+					if (this.sessionId !== void 0) this.manualSelection = void 0;
+					this.appliedSelection = void 0;
+					this.sessionId = session?.id;
+					this.set({
+						current: presetOf(session) ?? "",
+						error: null,
+						busy: false
+					});
 				}
-				const explicitDefault = available.find((entry) => entry.isDefault)?.id;
-				const recent = presetOf(this.currentSession());
-				this.fallback = explicitDefault ?? (recent !== void 0 && availableIds.has(recent) ? recent : void 0) ?? available[0]?.id ?? "";
-				const current = this.manualSelection ?? this.fallback;
-				if (this.store.getSnapshot().current !== current) this.set({ current });
+				return session;
 			}
-			/** Stage one preset for the next session, applying immediately when a blank session is current. */
+			/** Refresh the selectable roster without replacing a manual choice on this page. */
+			sync(roster) {
+				this.roster = roster.filter((entry) => !entry.hidden && !entry.broken);
+				if (!this.roster.some((entry) => entry.id === this.manualSelection)) this.manualSelection = void 0;
+				this.apply();
+			}
+			/** Apply a manual choice to this blank Session, or retain it until a Session exists. */
 			async select(id) {
+				this.session();
 				if (this.store.getSnapshot().busy) return;
-				this.stage(id);
+				this.manualSelection = id;
+				this.set({ error: null });
 				await this.apply();
 			}
-			/** Retain a hero pick until its blank Session becomes current. */
-			stage(id) {
-				this.manualSelection = id;
-				this.pendingApply = id;
-				this.set({
-					current: id,
-					error: null
-				});
-			}
-			/** Keep a repeated current-row choice selected while its default write settles. */
+			/** Preserve the current Session's selection while setting or clearing the default. */
 			retainSelection(id) {
+				this.session();
 				this.manualSelection = id;
-				this.set({ current: id });
 			}
-			/** Adopt a successful preset-group selection without staging another apply. */
-			acceptSelection(id) {
+			/** Adopt the exact Session already selected by the preset-group start operation. */
+			acceptSelection(sessionId, id) {
+				this.generation++;
+				this.sessionId = sessionId;
 				this.manualSelection = id;
-				this.pendingApply = void 0;
+				this.appliedSelection = {
+					id,
+					previous: void 0
+				};
 				this.set({
 					current: id,
 					error: null,
 					busy: false
 				});
 			}
-			/** Hand the staged choice to the current session, if there is one to take it. */
+			/** Reconcile the displayed preset and apply an initial or manual choice once. */
 			async apply() {
-				const staged = this.pendingApply;
-				const session = this.currentSession();
-				if (staged === void 0 || session === void 0) return;
-				if (!session.blank || presetOf(session) === staged) {
-					this.pendingApply = void 0;
+				if (this.disposed) return;
+				const session = this.session();
+				const projected = presetOf(session);
+				if (this.appliedSelection !== void 0 && (projected === this.appliedSelection.id || this.appliedSelection.previous !== void 0 && projected !== this.appliedSelection.previous)) this.appliedSelection = void 0;
+				const actual = session?.blank ? this.appliedSelection?.id ?? projected : projected;
+				const desired = this.manualSelection ?? this.roster.find((entry) => entry.isDefault)?.id ?? (this.roster.some((entry) => entry.id === actual) ? actual : void 0) ?? this.roster[0]?.id;
+				if (session === void 0) {
+					this.set({
+						current: desired ?? "",
+						busy: false
+					});
+					return;
+				}
+				if (!session.blank) {
+					this.manualSelection = void 0;
+					this.set({
+						current: actual ?? "",
+						busy: false
+					});
+					return;
+				}
+				if (this.flight !== void 0) {
+					this.set({
+						current: actual ?? "",
+						busy: true
+					});
+					await this.flight;
+					return this.apply();
+				}
+				if (desired === void 0 || desired === actual || this.store.getSnapshot().error !== null) {
+					this.set({
+						current: actual ?? "",
+						busy: false
+					});
 					return;
 				}
 				this.set({
-					busy: true,
-					error: null
+					current: actual ?? "",
+					busy: true
 				});
-				try {
-					const response = await this.remote.agentPresets.select(session.id, staged);
-					this.pendingApply = void 0;
-					if (!response.ok) {
+				const generation = this.generation;
+				const flight = Promise.resolve().then(async () => {
+					try {
+						const response = await this.remote.agentPresets.select(session.id, desired);
+						if (this.disposed || generation !== this.generation || this.currentSession()?.id !== session.id) return;
+						if (!response.ok) throw new Error(response.error.message);
+						this.manualSelection = response.value;
+						this.appliedSelection = {
+							id: response.value,
+							previous: projected
+						};
+						this.set({
+							current: response.value,
+							busy: false
+						});
+					} catch (error) {
+						if (this.disposed || generation !== this.generation || this.currentSession()?.id !== session.id) return;
 						this.manualSelection = void 0;
 						this.set({
+							current: this.appliedSelection?.id ?? presetOf(this.currentSession()) ?? "",
 							busy: false,
-							error: response.error.message,
-							current: this.fallback
+							error: messageOf(error)
 						});
-						return;
 					}
-					this.set({
-						busy: false,
-						current: response.value
-					});
-				} catch (error) {
-					this.manualSelection = void 0;
-					this.pendingApply = void 0;
-					this.set({
-						busy: false,
-						error: messageOf(error),
-						current: this.fallback
-					});
-				}
+				});
+				this.flight = flight;
+				await flight;
+				if (this.flight === flight) this.flight = void 0;
+			}
+			/** Ignore late Remote responses after this plugin scope is released. */
+			dispose() {
+				this.disposed = true;
 			}
 		};
 		/** Current agent-preset projection carried by one Session list row. */
@@ -1469,7 +1517,7 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 				return startPresetSession({
 					connectWorkspace: (target) => ctx.uiWorkspace.connectWorkspace(target),
 					selectPreset: (sessionId, presetId) => ctx.remote.agentPresets.select(sessionId, presetId),
-					acceptSelection: (selected) => seatRef?.acceptSelection(selected),
+					acceptSelection: (sessionId, selected) => seatRef?.acceptSelection(sessionId, selected),
 					open: (sessionId) => ctx.sessions.open(sessionId)
 				}, id, workspaceId);
 			};
@@ -1558,6 +1606,7 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 					}, SeatChip);
 					return () => {
 						stop();
+						seatCtl.dispose();
 						chip();
 						if (seatRef === seatCtl) seatRef = void 0;
 					};

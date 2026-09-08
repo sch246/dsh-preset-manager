@@ -96,7 +96,9 @@ ctx.inject(['slots', 'conversation', 'sessions', 'workspaces', 'connection'], (s
 })
 ```
 
-`SeatChip` 复刻官方 stage→apply 语义，名单换成派生名单：**过滤 hidden、按完整 order 的可见子序列、显示覆盖名**。初始选中依次取 settings user 层显式默认、当前或复用 Session 的最近预设、managed order 第一项可见健康预设；页面打开后的手动选择不被异步默认刷新覆盖。菜单标记显式默认项；不同项选择走 `select`，当前非默认项重复选择走 `setDefault`，当前显式默认项重复选择走 `unsetDefault` 并保留本次选择。设置或清除失败都在 hero 旁显示可见提示。
+`SeatChip` 使用按当前 Session 绑定的选择控制器，名单为派生名单：**过滤 hidden、按完整 order 的可见子序列、显示覆盖名**。初始选中依次取 settings user 层显式默认、当前或复用 Session 的最近预设、managed order 第一项可见健康预设；页面打开后的手动选择不被异步默认刷新覆盖。菜单标记显式默认项；不同项选择走 `select`，当前非默认项重复选择走 `setDefault`，当前显式默认项重复选择走 `unsetDefault` 并保留本次选择。设置或清除失败都在 hero 旁显示可见提示。
+
+选择控制器以 Session id 划分页面内选择；无 Session 时的选择只交给随后进入的第一个 Session。名单就绪后，初始选择和手动选择都通过既有 `agentPresets.select` 应用到空白 Session；显示名称以当前 Session 投影或刚成功的 RPC 结果为准，RPC 确认值仅保留到投影追上。重复列表通知复用进行中的请求，旧页面的响应不更新当前页面。失败显示当前实际模式并保留错误，下一次手动选择重试。预设组 `+` 把成功结果与目标 Session id 一起交给控制器，再同步打开该 Session。
 
 ## 4. 数据模型：完整顺序 + hidden + 显式用户默认（不变量驱动）
 

@@ -13,7 +13,7 @@ export interface PresetSessionStartActions {
     | { readonly ok: false }
   >
   /** Reconcile the hero seat after an out-of-band selection. */
-  acceptSelection: (presetId: string) => void
+  acceptSelection: (sessionId: SessionId, presetId: string) => void
   /** Navigate only after the Session carries the requested preset. */
   open: (sessionId: SessionId) => void
 }
@@ -38,7 +38,7 @@ export async function startPresetSession(
       console.warn('preset selection failed:', selected)
       return 'action.failed'
     }
-    actions.acceptSelection(selected.value)
+    actions.acceptSelection(sessionId, selected.value)
     actions.open(sessionId)
     return undefined
   } catch (error: unknown) {

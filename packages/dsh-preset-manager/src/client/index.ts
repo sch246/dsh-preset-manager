@@ -249,106 +249,133 @@ interface SeatSessionSummary {
   projectionValues?: SessionSummary['projectionValues']
 }
 
-/**
- * Stages the next session's preset and applies it when one becomes current
- * (the official stage→apply semantics, minus the introduce cue).
- */
+/** Keeps the hero selection attached to the current Session. */
 class SeatController {
   readonly store: SnapshotStore<SeatState> = createSnapshotStore<SeatState>({
-    current: '',
-    error: null,
-    busy: false,
+    current: '', error: null, busy: false,
   })
 
-  /** Current initial-priority result, used to recover a rejected selection. */
-  private fallback = ''
-  /** Manual choice retained for this mounted page across asynchronous refreshes. */
+  private roster: readonly RosterEntry[] = []
+  private sessionId: SessionId | undefined
+  /** A choice belongs to one page; an unbound choice follows its first Session. */
   private manualSelection: string | undefined
-  /** Manual choice still waiting to be applied to a blank Session. */
-  private pendingApply: string | undefined
+  /** Successful Remote result while the Session list projection catches up. */
+  private appliedSelection: { id: string; previous: string | undefined } | undefined
+  private flight: Promise<void> | undefined
+  private disposed = false
+  private generation = 0
 
   constructor(
     private readonly remote: Pick<ClientRemote, 'agentPresets'>,
-    /** The session the hero is about to hand over to, when there is one. */
     private readonly currentSession: () => SeatSessionSummary | undefined,
   ) {}
 
   private set(patch: Partial<SeatState>): void {
+    if (this.disposed) return
     this.store.set({ ...this.store.getSnapshot(), ...patch })
   }
 
-  /**
-   * Resolve initial selection from explicit user default → recent Session →
-   * first visible healthy managed entry. A later manual choice stays current.
-   */
-  sync(roster: readonly RosterEntry[]): void {
-    const available = roster.filter(entry => !entry.hidden && !entry.broken)
-    const availableIds = new Set(available.map(entry => entry.id))
-    if (this.manualSelection !== undefined && !availableIds.has(this.manualSelection)) {
-      this.manualSelection = undefined
-      this.pendingApply = undefined
+  /** Read the current Session and retire choices belonging to the previous page. */
+  private session(): SeatSessionSummary | undefined {
+    const session = this.currentSession()
+    if (session?.id !== this.sessionId) {
+      this.generation++
+      if (this.sessionId !== undefined) this.manualSelection = undefined
+      this.appliedSelection = undefined
+      this.sessionId = session?.id
+      this.set({ current: presetOf(session) ?? '', error: null, busy: false })
     }
-    const explicitDefault = available.find(entry => entry.isDefault)?.id
-    const recent = presetOf(this.currentSession())
-    this.fallback = explicitDefault
-      ?? (recent !== undefined && availableIds.has(recent) ? recent : undefined)
-      ?? available[0]?.id
-      ?? ''
-    const current = this.manualSelection ?? this.fallback
-    if (this.store.getSnapshot().current !== current) this.set({ current })
+    return session
   }
 
-  /** Stage one preset for the next session, applying immediately when a blank session is current. */
+  /** Refresh the selectable roster without replacing a manual choice on this page. */
+  sync(roster: readonly RosterEntry[]): void {
+    this.roster = roster.filter(entry => !entry.hidden && !entry.broken)
+    if (!this.roster.some(entry => entry.id === this.manualSelection)) this.manualSelection = undefined
+    void this.apply()
+  }
+
+  /** Apply a manual choice to this blank Session, or retain it until a Session exists. */
   async select(id: string): Promise<void> {
+    this.session()
     if (this.store.getSnapshot().busy) return
-    this.stage(id)
+    this.manualSelection = id
+    this.set({ error: null })
     await this.apply()
   }
 
-  /** Retain a hero pick until its blank Session becomes current. */
-  private stage(id: string): void {
-    this.manualSelection = id
-    this.pendingApply = id
-    this.set({ current: id, error: null })
-  }
-
-  /** Keep a repeated current-row choice selected while its default write settles. */
+  /** Preserve the current Session's selection while setting or clearing the default. */
   retainSelection(id: string): void {
+    this.session()
     this.manualSelection = id
-    this.set({ current: id })
   }
 
-  /** Adopt a successful preset-group selection without staging another apply. */
-  acceptSelection(id: string): void {
+  /** Adopt the exact Session already selected by the preset-group start operation. */
+  acceptSelection(sessionId: SessionId, id: string): void {
+    this.generation++
+    this.sessionId = sessionId
     this.manualSelection = id
-    this.pendingApply = undefined
+    this.appliedSelection = { id, previous: undefined }
     this.set({ current: id, error: null, busy: false })
   }
 
-  /** Hand the staged choice to the current session, if there is one to take it. */
+  /** Reconcile the displayed preset and apply an initial or manual choice once. */
   async apply(): Promise<void> {
-    const staged = this.pendingApply
-    const session = this.currentSession()
-    if (staged === undefined || session === undefined) return
-    if (!session.blank || presetOf(session) === staged) {
-      this.pendingApply = undefined
+    if (this.disposed) return
+    const session = this.session()
+    const projected = presetOf(session)
+    if (this.appliedSelection !== undefined && (projected === this.appliedSelection.id
+      || (this.appliedSelection.previous !== undefined && projected !== this.appliedSelection.previous))) {
+      this.appliedSelection = undefined
+    }
+    const actual = session?.blank ? this.appliedSelection?.id ?? projected : projected
+    const desired = this.manualSelection
+      ?? this.roster.find(entry => entry.isDefault)?.id
+      ?? (this.roster.some(entry => entry.id === actual) ? actual : undefined)
+      ?? this.roster[0]?.id
+    if (session === undefined) {
+      this.set({ current: desired ?? '', busy: false })
       return
     }
-    this.set({ busy: true, error: null })
-    try {
-      const response = await this.remote.agentPresets.select(session.id, staged)
-      this.pendingApply = undefined
-      if (!response.ok) {
-        this.manualSelection = undefined
-        this.set({ busy: false, error: response.error.message, current: this.fallback })
-        return
-      }
-      this.set({ busy: false, current: response.value })
-    } catch (error) {
+    if (!session.blank) {
       this.manualSelection = undefined
-      this.pendingApply = undefined
-      this.set({ busy: false, error: messageOf(error), current: this.fallback })
+      this.set({ current: actual ?? '', busy: false })
+      return
     }
+    if (this.flight !== undefined) {
+      this.set({ current: actual ?? '', busy: true })
+      await this.flight
+      return this.apply()
+    }
+    if (desired === undefined || desired === actual || this.store.getSnapshot().error !== null) {
+      this.set({ current: actual ?? '', busy: false })
+      return
+    }
+    // A visible choice reports the committed preset until the Host confirms its replacement.
+    this.set({ current: actual ?? '', busy: true })
+    const generation = this.generation
+    const flight = Promise.resolve().then(async () => {
+      try {
+        const response = await this.remote.agentPresets.select(session.id, desired)
+        if (this.disposed || generation !== this.generation || this.currentSession()?.id !== session.id) return
+        if (!response.ok) throw new Error(response.error.message)
+        this.manualSelection = response.value
+        this.appliedSelection = { id: response.value, previous: projected }
+        this.set({ current: response.value, busy: false })
+      } catch (error) {
+        if (this.disposed || generation !== this.generation || this.currentSession()?.id !== session.id) return
+        this.manualSelection = undefined
+        this.set({ current: this.appliedSelection?.id ?? presetOf(this.currentSession()) ?? '', busy: false, error: messageOf(error) })
+      }
+    })
+    this.flight = flight
+    await flight
+    if (this.flight === flight) this.flight = undefined
+  }
+
+  /** Ignore late Remote responses after this plugin scope is released. */
+  dispose(): void {
+    this.disposed = true
   }
 }
 
@@ -385,7 +412,7 @@ export function apply(ctx: ClientContext): void {
     return startPresetSession({
       connectWorkspace: target => ctx.uiWorkspace.connectWorkspace(target),
       selectPreset: (sessionId, presetId) => ctx.remote.agentPresets.select(sessionId, presetId),
-      acceptSelection: selected => seatRef?.acceptSelection(selected),
+      acceptSelection: (sessionId, selected) => seatRef?.acceptSelection(sessionId, selected),
       open: sessionId => ctx.sessions.open(sessionId),
     }, id, workspaceId)
   }
@@ -483,6 +510,7 @@ export function apply(ctx: ClientContext): void {
       }, SeatChip)
       return () => {
         stop()
+        seatCtl.dispose()
         chip()
         if (seatRef === seatCtl) seatRef = undefined
       }

@@ -217,7 +217,7 @@ index 50fb8e507f..2a4613ccf8 100644
 -`dsh-client-ui-workspace` 是 dsh Web 客户端的共享 Workspace 浏览器与选择器：用户在侧边栏浏览分组或扁平的 Session 行，在 Session Intent 主视觉区为新会话选择 Workspace，并可用添加、重命名、重排序、搜索、fork 与归档操作管理 Workspace 与 Session；两个界面共用同一套 Workspace 菜单与添加流程。待处理的用户交互以琥珀色警告点呈现，活动 Schedule projection 会在普通行与搜索结果中显示不可交互的闹钟，共享侧边栏投影还会隐藏 subagent 来源的会话。不同的规范化路径仍作为由 id 区分的独立 Workspace；添加文件夹走目录流子 slot，由组合的选择器包 client half 填充。
 +`dsh-client-ui-workspace` 是 dsh Web 客户端的共享 Workspace 浏览器与选择器：用户在侧边栏浏览分组或扁平的 Session 行，在 Session Intent 主视觉区为新会话选择 Workspace，并可用添加、重命名、重排序、搜索、fork 与归档操作管理 Workspace 与 Session；两个界面共用同一套 Workspace 菜单与添加流程。待处理的用户交互以琥珀色警告点呈现，活动 Schedule projection 会在普通行与搜索结果中显示不可交互的闹钟，共享侧边栏投影还会隐藏 subagent 来源的会话。不同的规范化路径仍作为由 id 区分的独立 Workspace；添加文件夹走目录流子 slot，由组合的选择器包 client half 填充。可选的 preset 分组子项会收到同一份 Session 派生、行呈现、溢出控件与必需 Session 操作，因此替代分组不会替换官方行行为。
 diff --git a/packages/client/ui-workspace/src/client/contract/slots.ts b/packages/client/ui-workspace/src/client/contract/slots.ts
-index df17251c38..120b52103b 100644
+index df17251..4510ae2 100644
 --- a/packages/client/ui-workspace/src/client/contract/slots.ts
 +++ b/packages/client/ui-workspace/src/client/contract/slots.ts
 @@ -24,0 +25 @@
@@ -234,7 +234,7 @@ index df17251c38..120b52103b 100644
 +    /** Alternate preset-group body under the official Workspace browser. */
 +    'sidebar.workspaces.presetGroups': { kind: 'single'; scope: 'root'; owner: PresetGroupsOwnerProps }
 +    // @meta-intent:end dsh-preset-manager sidebar.workspaces.presetGroups
-@@ -62,0 +70,68 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
+@@ -62,0 +70,65 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 +// @meta-intent:begin dsh-preset-manager workspace.rows.alternateGrouping
 +/** Required Session actions retained by every alternate grouping occupant. */
 +export interface PresetSessionActions {
@@ -276,20 +276,17 @@ index df17251c38..120b52103b 100644
 +    drag?: { start: () => void; end: () => void }
 +    onToggle: () => void
 +  }) => ReactNode
-+  /** Render an official Session row with grouping metadata and all ordinary actions. */
-+  renderSessionRow: (input: {
-+    node: SessionNode
-+    currentId: SessionId | undefined
-+    now: number
-+    meta?: ReactNode
++  /** Render official group Sessions with persisted ordering, drag handling and overflow. */
++  renderSessions: (input: {
++    groupKey: string
++    list: SessionListState
++    /** Complete group membership, including rows hidden by search or collapse. */
++    sessions: readonly SessionNode[]
++    visibleIds: readonly SessionId[]
++    expanded: boolean
++    meta: (id: SessionId) => string | undefined
 +    onOpen: (sessionId: SessionId) => void
 +  } & PresetSessionActions) => ReactNode
-+  /** Render the official collapsed-group overflow action. */
-+  renderSessionOverflow: (input: {
-+    expanded: boolean
-+    remaining: number
-+    onToggle: () => void
-+  }) => ReactNode
 +}
 +
 +/** Owner facts supplied to the alternate preset grouping occupant. */
@@ -303,7 +300,7 @@ index df17251c38..120b52103b 100644
 +}
 +// @meta-intent:end dsh-preset-manager workspace.rows.alternateGrouping
 +
-@@ -150 +225,3 @@ export type WorkspaceBrowserProps =
+@@ -150 +222,3 @@ export type WorkspaceBrowserProps =
 -  & PropsRenderSlots<'sidebar.workspaces.directoryFlow'>
 +  // @meta-intent:begin dsh-preset-manager workspace.browser.presetChild
 +  & PropsRenderSlots<'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.presetGroups'>
@@ -511,7 +508,7 @@ index 0f917100ff..6accea89c9 100644
 @@ -501,0 +529 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
 +// @meta-intent:end dsh-preset-manager workspace.rows.sessionMetadata
 diff --git a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
-index 9d9dd376e4..25dc1a52e4 100644
+index 9d9dd37..d1227ef 100644
 --- a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
 +++ b/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
 @@ -23 +23 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -531,27 +528,183 @@ index 9d9dd376e4..25dc1a52e4 100644
 @@ -187 +188 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
 -        if (id === 'workspace' || id === 'flat') onGroupPick(id)
 +        if (id === 'workspace' || id === 'flat' || id === 'preset') onGroupPick(id)
-@@ -877,0 +879 @@ export function WorkspaceBrowser({
+@@ -592,0 +594 @@ function SessionTree({
++// @meta-intent:begin dsh-preset-manager workspace.rows.orderedSessions
+@@ -619,0 +622,37 @@ function FlatList({
++  return (
++    <div className={clsx(css.treeBody, css.wide)}>
++      <div className={clsx(css.list, css.flatList)} role="tree" aria-label={t('section.sessions')}>
++        {baseRows.length === 0 && <div className={css.empty}>{t('empty.none')}</div>}
++        <OrderedSessionRows
++          list={list} baseRows={baseRows} accountKey={FLAT_SESSION_ORDER_KEY}
++          open={open} forkSession={forkSession} onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
++          orderBy={orderBy} sessionOrderByAccount={sessionOrderByAccount}
++          sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
++          syncSessionOrderAccount={syncSessionOrderAccount} setSessionOrder={setSessionOrder}
++          flat t={t}
++        />
++      </div>
++      <span className={css.fade} />
++    </div>
++  )
++}
++
++/** Official editable Session rows; filtering and collapse never truncate the persisted account. */
++function OrderedSessionRows({
++  list, baseRows, accountKey, open, forkSession, onSessionRename, onSessionArchive,
++  orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder,
++  flat = false, expanded = true, visibleIds, meta, t,
++}: Pick<SessionTreeProps,
++  'open' | 'forkSession' | 'onSessionRename' | 'onSessionArchive' | 'orderBy'
++  | 'sessionOrderByAccount' | 'sessionUpdatedAtByAccount' | 'syncSessionOrderAccount' | 'setSessionOrder' | 't'
++> & {
++  list: SessionListState
++  baseRows: readonly SessionNode[]
++  accountKey: string
++  flat?: boolean
++  expanded?: boolean
++  visibleIds?: readonly SessionId[]
++  meta?: (id: SessionId) => string | undefined
++}) {
++  const [overflowExpanded, setOverflowExpanded] = useState(false)
++  useEffect(() => { if (!expanded) setOverflowExpanded(false) }, [expanded])
+@@ -624,2 +663,2 @@ function FlatList({
+-    const previousOrder = sessionOrderByAccount[FLAT_SESSION_ORDER_KEY]
+-    const previousUpdatedAt = sessionUpdatedAtByAccount[FLAT_SESSION_ORDER_KEY] ?? {}
++    const previousOrder = sessionOrderByAccount[accountKey]
++    const previousUpdatedAt = sessionUpdatedAtByAccount[accountKey] ?? {}
+@@ -637 +676 @@ function FlatList({
+-      syncSessionOrderAccount(FLAT_SESSION_ORDER_KEY, next.order.map(id => id as string), next.updatedAt)
++      syncSessionOrderAccount(accountKey, next.order.map(id => id as string), next.updatedAt)
+@@ -639 +678 @@ function FlatList({
+-  }, [list, orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, sessionIds, syncSessionOrderAccount])
++  }, [accountKey, list, orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, sessionIds, syncSessionOrderAccount])
+@@ -642 +681 @@ function FlatList({
+-    return reconciledSessionOrder(sessionIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
++    return reconciledSessionOrder(sessionIds, sessionOrderByAccount[accountKey])
+@@ -647 +686 @@ function FlatList({
+-  }, [baseRows, sessionOrderByAccount, sessionIds])
++  }, [accountKey, baseRows, sessionOrderByAccount, sessionIds])
+@@ -665 +704 @@ function FlatList({
+-    setSessionOrder(FLAT_SESSION_ORDER_KEY, nextOrder.map(id => id as string))
++    setSessionOrder(accountKey, nextOrder.map(id => id as string))
+@@ -666,0 +706,3 @@ function FlatList({
++  const visible = visibleIds === undefined ? rows : rows.filter(node => visibleIds.includes(node.id))
++  const collapsed = collapsedSessionRows(visible)
++  const shown = !expanded ? [] : flat || overflowExpanded ? visible : collapsed.rows
+@@ -669,44 +711,45 @@ function FlatList({
+-    <div className={clsx(css.treeBody, css.wide)}>
+-      <div className={clsx(css.list, css.flatList)} role="tree" aria-label={t('section.sessions')}>
+-        {rows.length === 0 && (
+-          <div className={css.empty}>{t('empty.none')}</div>
+-        )}
+-        {rows.map((node) => {
+-          const active = drag !== null
+-          return (
+-            <SessionNodeItem
+-              key={node.id}
+-              node={node}
+-              currentId={list.current}
+-              now={now}
+-              onOpen={open}
+-              onRename={onSessionRename}
+-              onFork={forkSession}
+-              onArchive={onSessionArchive}
+-              flat
+-              drag={{
+-                start: () => {
+-                  dropCommitted.current = false
+-                  setDrag({ accountKey: FLAT_SESSION_ORDER_KEY, sessionId: node.id, over: null })
+-                },
+-                active,
+-                marker: active && drag.over?.id === node.id ? drag.over.half : null,
+-                hover: (half) => {
+-                  setDrag(current => current === null ? current : { ...current, over: { id: node.id, half } })
+-                },
+-                drop: (half) => {
+-                  if (drag !== null) commitDrag(drag, { id: node.id, half })
+-                },
+-                end: () => {
+-                  if (drag?.over !== null && drag?.over !== undefined) commitDrag(drag, drag.over)
+-                  else setDrag(null)
+-                  dropCommitted.current = false
+-                },
+-              }}
+-              t={t}
+-            />
+-          )
+-        })}
+-      </div>
+-      <span className={css.fade} />
+-    </div>
++    <>
++      {shown.map((node) => {
++        const active = drag !== null
++        return (
++          <SessionNodeItem
++            key={node.id}
++            node={node}
++            currentId={list.current}
++            now={now}
++            onOpen={open}
++            onRename={onSessionRename}
++            onFork={forkSession}
++            onArchive={onSessionArchive}
++            flat={flat}
++            meta={meta?.(node.id)}
++            drag={{
++              start: () => {
++                dropCommitted.current = false
++                setDrag({ accountKey, sessionId: node.id, over: null })
++              },
++              active,
++              marker: active && drag.over?.id === node.id ? drag.over.half : null,
++              hover: (half) => {
++                setDrag(current => current === null ? current : { ...current, over: { id: node.id, half } })
++              },
++              drop: (half) => {
++                if (drag !== null) commitDrag(drag, { id: node.id, half })
++              },
++              end: () => {
++                if (drag?.over !== null && drag?.over !== undefined) commitDrag(drag, drag.over)
++                else setDrag(null)
++                dropCommitted.current = false
++              },
++            }}
++            t={t}
++          />
++        )
++      })}
++      {expanded && !flat && collapsed.hiddenCount > 0 && (
++        <button type="button" className={css.sessionOverflowButton} aria-expanded={overflowExpanded}
++          onClick={() => { setOverflowExpanded(value => !value) }}>
++          {overflowExpanded ? t('sessions.collapse') : t('sessions.expand', { n: collapsed.hiddenCount })}
++        </button>
++      )}
++    </>
+@@ -714,0 +758 @@ function FlatList({
++// @meta-intent:end dsh-preset-manager workspace.rows.orderedSessions
+@@ -877,0 +922 @@ export function WorkspaceBrowser({
 +  const contentSearchQuery = groupBy === 'preset' ? '' : normalizedQuery
-@@ -928 +930 @@ export function WorkspaceBrowser({
+@@ -928 +973 @@ export function WorkspaceBrowser({
 -    if (normalizedQuery === '') {
 +    if (contentSearchQuery === '') {
-@@ -934 +936 @@ export function WorkspaceBrowser({
+@@ -934 +979 @@ export function WorkspaceBrowser({
 -      query: normalizedQuery,
 +      query: contentSearchQuery,
-@@ -940 +942 @@ export function WorkspaceBrowser({
+@@ -940 +985 @@ export function WorkspaceBrowser({
 -      searchSessions(normalizedQuery, controller.signal).then((result) => {
 +      searchSessions(contentSearchQuery, controller.signal).then((result) => {
-@@ -943 +945 @@ export function WorkspaceBrowser({
+@@ -943 +988 @@ export function WorkspaceBrowser({
 -          query: normalizedQuery,
 +          query: contentSearchQuery,
-@@ -951 +953 @@ export function WorkspaceBrowser({
+@@ -951 +996 @@ export function WorkspaceBrowser({
 -          query: normalizedQuery,
 +          query: contentSearchQuery,
-@@ -962 +964 @@ export function WorkspaceBrowser({
+@@ -962 +1007 @@ export function WorkspaceBrowser({
 -  }, [normalizedQuery, searchSessions])
 +  }, [contentSearchQuery, searchSessions])
-@@ -1034,0 +1037,43 @@ export function WorkspaceBrowser({
+@@ -1034,0 +1080,42 @@ export function WorkspaceBrowser({
 +  // @meta-intent:begin dsh-preset-manager workspace.rows.presetOwner
 +  const presetRows = useMemo<PresetRowsOwner>(() => ({
 +    deriveSessions: deriveFlat,
@@ -581,28 +734,27 @@ index 9d9dd376e4..25dc1a52e4 100644
 +      </div>
 +    ),
 +    renderProjectRow: props => <ProjectRowItem {...props} t={t} />,
-+    renderSessionRow: props => <SessionNodeItem {...props} t={t} />,
-+    renderSessionOverflow: ({ expanded, remaining, onToggle }) => (
-+      <button
-+        type="button"
-+        className={css.sessionOverflowButton}
-+        aria-expanded={expanded}
-+        onClick={onToggle}
-+      >
-+        {expanded ? t('sessions.collapse') : t('sessions.expand', { n: remaining })}
-+      </button>
++    renderSessions: ({ groupKey, list, sessions, visibleIds, expanded, meta, onOpen, onRename, onFork, onArchive }) => (
++      <OrderedSessionRows
++        key={groupKey} accountKey={`__preset_session_order__:${groupKey}`}
++        list={list} baseRows={sessions} visibleIds={visibleIds} expanded={expanded} meta={meta}
++        open={onOpen} onSessionRename={onRename} forkSession={onFork} onSessionArchive={onArchive}
++        orderBy={orderBy} sessionOrderByAccount={sessionOrderByAccount}
++        sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
++        syncSessionOrderAccount={actions.syncSessionOrderAccount} setSessionOrder={actions.setSessionOrder} t={t}
++      />
 +    ),
-+  }), [t])
++  }), [t, orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, actions.syncSessionOrderAccount, actions.setSessionOrder])
 +  // @meta-intent:end dsh-preset-manager workspace.rows.presetOwner
 +
-@@ -1075 +1120,5 @@ export function WorkspaceBrowser({
+@@ -1075 +1162,5 @@ export function WorkspaceBrowser({
 -            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
 +            {groupBy === 'flat'
 +              ? t('section.sessions')
 +              : groupBy === 'preset'
 +                ? t('section.presets')
 +                : t('section.workspaces')}
-@@ -1204 +1253,11 @@ export function WorkspaceBrowser({
+@@ -1204 +1295,11 @@ export function WorkspaceBrowser({
 -        {wide && (normalizedQuery !== ''
 +        {wide && (groupBy === 'preset'
 +          ? renderSlot('sidebar.workspaces.presetGroups', {
@@ -616,7 +768,7 @@ index 9d9dd376e4..25dc1a52e4 100644
 +          })
 +          : normalizedQuery !== ''
 diff --git a/packages/client/ui-workspace/src/client/stores.ts b/packages/client/ui-workspace/src/client/stores.ts
-index a042f76ff0..9f6ce231eb 100644
+index a042f76..112d3ed 100644
 --- a/packages/client/ui-workspace/src/client/stores.ts
 +++ b/packages/client/ui-workspace/src/client/stores.ts
 @@ -13,2 +13,4 @@ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
@@ -634,6 +786,16 @@ index a042f76ff0..9f6ce231eb 100644
 +        if (mode === 'updated') d.sessionUpdatedAtByAccount = {}
 +      },
 +      // @meta-intent:end dsh-preset-manager workspace.orderBy.refresh
+@@ -70,0 +78 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
++        // @meta-intent:begin dsh-preset-manager workspace.orderAccounts.preset
+@@ -72 +80 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
+-          Object.entries(d.sessionOrderByAccount).filter(([key]) => retained.has(key)),
++          Object.entries(d.sessionOrderByAccount).filter(([key]) => retained.has(key) || key.startsWith('__preset_session_order__:')),
+@@ -75 +83 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
+-          Object.entries(d.sessionUpdatedAtByAccount).filter(([key]) => retained.has(key)),
++          Object.entries(d.sessionUpdatedAtByAccount).filter(([key]) => retained.has(key) || key.startsWith('__preset_session_order__:')),
+@@ -76,0 +85 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
++        // @meta-intent:end dsh-preset-manager workspace.orderAccounts.preset
 diff --git a/packages/preset/agent-presets/README.i18n.yaml b/packages/preset/agent-presets/README.i18n.yaml
 index 7e482db6c2..7b7509ea1d 100644
 --- a/packages/preset/agent-presets/README.i18n.yaml

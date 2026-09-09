@@ -180,7 +180,9 @@ export interface PresetGroupNode {
     broken: boolean;
     /** Visible sessions in the group (after the query filter). */
     sessionCount: number;
-    /** Visible session rows, newest first. */
+    /** Complete membership for the official editable order account. */
+    allSessions: readonly PresetSessionNode[];
+    /** Session rows matching the current search. */
     sessions: readonly PresetSessionNode[];
 }
 /**

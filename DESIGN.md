@@ -53,6 +53,7 @@
    - 列表主体分支：`groupBy === 'preset'` 时优先渲染
       `renderSlot('sidebar.workspaces.presetGroups', { query: normalizedQuery, rows: presetRows })`
      （preset 模式下搜索态交给插件树做标题过滤，不再走全局内容搜索）；
+   - `renderSessions` 复用官方扁平列表的 `OrderedSessionRows`，负责组内拖动、五行溢出与排序刷新；每组使用官方视图存储的 `__preset_session_order__:<presetId>` 账户，Workspace 清理保留该前缀。搜索与折叠只过滤显示，不截断完整顺序；
    - 节标题：`'preset'` 时用 `t('section.presets')`。
 7. **历史 Session 投影回填**：session-projection 判断当前 client-visible checkpoint 是否完整；session-projection-cache 把完整性随缓存快照暴露；session-controller 在既有物理大小上限内重折叠不完整冷缓存并回写派生 checkpoint。相关包 README 与 generator 链接映射同属静态补丁。
 8. **冷 Session 的目标 preset 激活**：`agentPresets/select` wire endpoint 保持 `(SessionId, presetId)`，由 Session Controller 接管原始 Session id。已有空白 Agent 走领域切换；冷空白 Session 直接在目标 preset 下恢复，并在完整 Agent 发布成功后追加选择事件。旧 preset 缺失不会抢先令目标选择失败；同一 Session 的并发恢复复用 Session Controller 的 singleflight，无关恢复失败后按请求目标重试。Agent Presets 与 Session Controller 的 README 同属静态补丁。
@@ -155,7 +156,7 @@ derivePresetGroups(list, officialSessionNodes, roster, order, query)  // → 组
 
 - 显示名 = `overrides[id].name ?? preset.name ?? id`；
 - selector 与 sidebar 消费同一 managed order；尚未来得及 reconcile 的 Host 新增项按 Host 顺序尾随；
-- 组内会话按 `updatedAt` 倒序（v1 无组内拖拽）；选择或重选“最近更新”都以当前会话集重新计算顺序，避免恢复部署后沿用旧的浏览器排序快照；
+- 组内会话复用官方可编辑顺序：手动模式保持拖动位置，最近更新模式允许拖动并在后续活动时提升会话；选择或重选“最近更新”按当前会话集重新排序。顺序存于官方 `dsh.workspace.view.v5`，各预设及“未分组”各自独立，不写 Workspace 的 Host 顺序；
 - 组树布局：可见预设组按 `order` 的可见子序列 → 隐藏预设组（置灰、不可拖拽、固定排在所有可见组之后，内部仍按完整 `order`）→ “未分组”兜底组最后；
 - Session 可见性与状态直接消费 ui-workspace 的官方投影（非 subagent、未归档、blank 仅当前、运行子代理与待交互状态），本插件不重建 `deriveFlat`；
 - `query`（浏览器搜索态）在 preset 模式下交给组树做标题过滤：组标题或组内会话标题匹配则保留组，非空时组内会话行同步过滤。
@@ -221,7 +222,7 @@ packages/dsh-preset-manager/src/client/
 1. 需要 harness 补丁并重建 Host 与 web bundle；dsh 升级时补丁可能需重新适配（`--check` 先测）。
 2. 重命名是显示层覆盖：不写 `preset.yml`，官方设置页"预设"节仍显示原名；不改 id。
 3. 顺序/隐藏只影响分组树 + shadow chip；官方设置页预设列表保持 host 顺序。
-4. 组内会话固定按最近更新排序（v1）。
+4. 会话仅在当前预设组内拖动；拖动不切换会话预设，组内顺序不跨浏览器同步。
 5. 无 workspace 时 + 无操作。
 6. 列表存于浏览器 localStorage（`dsh.presetManager.v1`，与 `dsh.workspace.view.v5` 同级先例），不跨浏览器共享；显式用户默认在官方 settings 里（host 持久）。
 

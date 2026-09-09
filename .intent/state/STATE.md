@@ -42,7 +42,7 @@ The plugin should feel like a native extension of the existing workspace and new
 
 ### P4. Preserve the host's presentation authority
 
-- Official Harness components remain responsible for session projection, rows, runtime status, expansion and drag semantics.
+- Official Harness components remain responsible for session projection, rows, runtime status, expansion and drag semantics. Sessions can be reordered within their preset group, including hidden presets and the ungrouped fallback; the current browser retains that order across reloads, and the selected ordering mode governs activity promotion.
 - Preset-manager-owned UI is limited to preset grouping, decorations and preset actions unless a later user decision changes that boundary.
 - Reuse must not remove ordinary session-row capabilities. Rename, fork, archive and the row overflow entry remain available in preset grouping mode.
 - Removing or disabling the plugin restores the official new-conversation preset selector.

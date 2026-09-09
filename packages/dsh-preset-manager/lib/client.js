@@ -275,6 +275,7 @@ window.__ModuleLoader__.load({
 					hidden,
 					broken: entry?.broken === true,
 					sessionCount: sessions.length,
+					allSessions: members,
 					sessions
 				});
 			};
@@ -664,8 +665,6 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 		* whole display layer (drag / hide / unhide / rename / new session)
 		* through the injected face; all derivation stays in roster.ts.
 		*/
-		/** Session rows visible per group before the local overflow control. */
-		const COLLAPSED_SESSION_LIMIT = 5;
 		/** Accept native drops at document level while a row drag is active (mirror of the workspace browser). */
 		function useNativeDragAcceptance(active) {
 			(0, react.useEffect)(() => {
@@ -698,7 +697,6 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 			const state = useStore((snapshot) => snapshot);
 			const rosterSnapshot = useRoster((snapshot) => snapshot);
 			const [expandedGroups, setExpandedGroups] = (0, react.useState)([]);
-			const [expandedSessionGroups, setExpandedSessionGroups] = (0, react.useState)([]);
 			const [drag, setDrag] = (0, react.useState)(null);
 			const dropCommitted = (0, react.useRef)(false);
 			const [notice, setNotice] = (0, react.useState)(null);
@@ -772,7 +770,6 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 				next.splice(insertAt === -1 ? next.length : insertAt, 0, active.sourceId);
 				actions.setOrder(next);
 			};
-			const now = Date.now();
 			const toggle = (key) => {
 				setExpandedGroups((keys) => keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]);
 			};
@@ -825,8 +822,6 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 						"aria-label": t("tree.aria"),
 						children: [status, groups.map((group) => {
 							const expanded = expandedGroups.includes(group.key);
-							const overflowExpanded = expandedSessionGroups.includes(group.key);
-							const shown = !expanded ? [] : overflowExpanded ? group.sessions : group.sessions.slice(0, COLLAPSED_SESSION_LIMIT);
 							const entry = group.presetId === void 0 ? void 0 : roster.find((r) => r.id === group.presetId);
 							const marker = drag !== null && drag.over?.id === group.key ? drag.over.half : null;
 							const canDrag = group.presetId !== void 0 && !group.hidden;
@@ -883,25 +878,19 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 									}
 								} } : {},
 								onToggle: () => {
-									if (expanded) setExpandedSessionGroups((keys) => keys.filter((key) => key !== group.key));
 									toggle(group.key);
 								}
 							});
-							const sessionRows = shown.map((node) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react.Fragment, { children: rows.renderSessionRow({
-								node,
-								currentId: list.current,
-								now,
-								meta: workspaceLabelOf(node.id),
+							const sessionRows = rows.renderSessions({
+								groupKey: group.key,
+								list,
+								sessions: group.allSessions,
+								visibleIds: group.sessions.map((node) => node.id),
+								expanded,
+								meta: workspaceLabelOf,
 								onOpen: open,
 								...sessionActions
-							}) }, node.id));
-							const overflow = expanded && group.sessions.length > COLLAPSED_SESSION_LIMIT ? rows.renderSessionOverflow({
-								expanded: overflowExpanded,
-								remaining: group.sessions.length - COLLAPSED_SESSION_LIMIT,
-								onToggle: () => {
-									setExpandedSessionGroups((keys) => keys.includes(group.key) ? keys.filter((key) => key !== group.key) : [...keys, group.key]);
-								}
-							}) : null;
+							});
 							return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react.Fragment, { children: rows.renderProjectGroup({
 								...canDrag ? { drag: {
 									active: drag !== null,
@@ -922,11 +911,7 @@ button:focus-visible .pm-menu-item-default-candidate .pm-menu-item-default-actio
 										});
 									}
 								} } : {},
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-									projectRow,
-									sessionRows,
-									overflow
-								] })
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [projectRow, sessionRows] })
 							}) }, group.key);
 						})]
 					}),

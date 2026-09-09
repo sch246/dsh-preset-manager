@@ -20,9 +20,6 @@ import { PresetRowActions, PresetRowMeta } from './PresetRowDecorations.tsx'
 import { RenameDialog } from './RenameDialog.tsx'
 import { css } from './styles.ts'
 
-/** Session rows visible per group before the local overflow control. */
-const COLLAPSED_SESSION_LIMIT = 5
-
 /** Registration-side business face for the preset tree. */
 export interface PresetGroupsInjected {
   hooks: {
@@ -95,7 +92,6 @@ export function PresetGroups({
   const rosterSnapshot = useRoster(snapshot => snapshot)
 
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
-  const [expandedSessionGroups, setExpandedSessionGroups] = useState<string[]>([])
   const [drag, setDrag] = useState<PresetGroupDragState | null>(null)
   const dropCommitted = useRef(false)
   const [notice, setNotice] = useState<PresetManagerKey | null>(null)
@@ -175,7 +171,6 @@ export function PresetGroups({
     actions.setOrder(next)
   }
 
-  const now = Date.now()
   const toggle = (key: string): void => {
     setExpandedGroups(keys => keys.includes(key) ? keys.filter(k => k !== key) : [...keys, key])
   }
@@ -209,12 +204,6 @@ export function PresetGroups({
         {status}
         {groups.map((group: PresetGroupNode) => {
           const expanded = expandedGroups.includes(group.key)
-          const overflowExpanded = expandedSessionGroups.includes(group.key)
-          const shown = !expanded
-            ? []
-            : overflowExpanded
-              ? group.sessions
-              : group.sessions.slice(0, COLLAPSED_SESSION_LIMIT)
           const entry = group.presetId === undefined ? undefined : roster.find(r => r.id === group.presetId)
           const marker = drag !== null && drag.over?.id === group.key ? drag.over.half : null
           const canDrag = group.presetId !== undefined && !group.hidden
@@ -265,35 +254,19 @@ export function PresetGroups({
                 }
               : {}),
             onToggle: () => {
-              if (expanded) {
-                setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
-              }
               toggle(group.key)
             },
           })
-          const sessionRows = shown.map(node => (
-            <Fragment key={node.id as string}>
-              {rows.renderSessionRow({
-                node,
-                currentId: list.current,
-                now,
-                meta: workspaceLabelOf(node.id),
-                onOpen: open,
-                ...sessionActions,
-              })}
-            </Fragment>
-          ))
-          const overflow = expanded && group.sessions.length > COLLAPSED_SESSION_LIMIT
-            ? rows.renderSessionOverflow({
-              expanded: overflowExpanded,
-              remaining: group.sessions.length - COLLAPSED_SESSION_LIMIT,
-              onToggle: () => {
-                setExpandedSessionGroups(keys => keys.includes(group.key)
-                  ? keys.filter(key => key !== group.key)
-                  : [...keys, group.key])
-              },
-            })
-            : null
+          const sessionRows = rows.renderSessions({
+            groupKey: group.key,
+            list,
+            sessions: group.allSessions,
+            visibleIds: group.sessions.map(node => node.id),
+            expanded,
+            meta: workspaceLabelOf,
+            onOpen: open,
+            ...sessionActions,
+          })
           return (
             <Fragment key={group.key}>
               {rows.renderProjectGroup({
@@ -311,7 +284,7 @@ export function PresetGroups({
                       },
                     }
                   : {}),
-                children: <>{projectRow}{sessionRows}{overflow}</>,
+                children: <>{projectRow}{sessionRows}</>,
               })}
             </Fragment>
           )
